@@ -1,5 +1,6 @@
 <template>
   <div class="saunatimer">
+    <div class="saunatimer__logo">SAUNA</div>
     <div class="saunatimer__circle"></div>
     <div class="saunatimer__second" :style="{transform:secondRotateDeg}"></div>
     <div class="saunatimer__minute" :style="{transform:minuteRotateDeg}"></div>
@@ -8,6 +9,7 @@
         <i :style="{transform:transform}">{{h}}</i>
       </span>
     </b>
+    <div class="saunatimer__title">12min</div>
   </div>
 </template>
 
@@ -98,7 +100,7 @@ export default {
       border-radius: 4px;
       transform: rotateZ(360deg);
       transform-origin: bottom;
-      z-index: 1;
+      z-index: 2;
       // transition-duration: 0.1s;
     }
 
@@ -115,6 +117,33 @@ export default {
       border-radius: 4px;
       transform: rotateZ(60deg);
       transform-origin: bottom;
+      z-index: 1;
+    }
+
+    &__logo {
+      position: absolute;
+      top: 28%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Overpass', sans-serif;
+      font-size: 18px;
+      color: #464646;
+      letter-spacing: 0.1rem;
+      z-index: 0;
+    }
+
+    &__title {
+      position: absolute;
+      top: 65%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Overpass', sans-serif;
+      font-size: 16px;
+      font-style: italic;
+      color: #fff;
+      background: #1800ff;
+      padding: 2px 6px 2px 4px;
+      border-radius: 1px;
       z-index: 0;
     }
 

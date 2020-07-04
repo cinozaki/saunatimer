@@ -70,7 +70,7 @@ export default {
         inset -5px 0px 20px rgba(0,0,0, 0.4), 
         20px 20px 30px rgba(0,0,0,.4),
         40px 40px 60px rgba(0,0,0,.4);
-    border: 8px solid #f5f5dc;
+    border: 8px solid #eee;
     border-radius: 256px;
     z-index: 0;
 
@@ -113,7 +113,7 @@ export default {
       width: 12px;
       height: 35%;
       margin-left: -6px;
-      background: #000;
+      background: #333;
       border-radius: 4px;
       transform: rotateZ(60deg);
       transform-origin: bottom;
@@ -160,7 +160,7 @@ export default {
       width: 32px;
       height: 50%;
       margin-left: -18px;
-      padding-top: 0;
+      padding-top: 8px;
       font-family: 'Overpass', sans-serif;
       letter-spacing: -0.2rem;
       font-size: 38px;

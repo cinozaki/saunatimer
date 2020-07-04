@@ -130,6 +130,7 @@ export default {
       color: #464646;
       letter-spacing: 0.1rem;
       z-index: 0;
+      user-select: none;
     }
 
     &__title {
@@ -145,6 +146,7 @@ export default {
       padding: 2px 6px 2px 4px;
       border-radius: 1px;
       z-index: 0;
+      user-select: none;
     }
 
   }

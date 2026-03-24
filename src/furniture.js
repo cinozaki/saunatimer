@@ -55,12 +55,48 @@ function buildBench(scene) {
     }
   });
 
-  // 背もたれ（右壁全面、最上段の背面）
-  const backHeight = 0.5;
-  const backGeo = new THREE.BoxGeometry(0.05, backHeight, BENCH_LENGTH);
-  const back = new THREE.Mesh(backGeo, benchMat);
-  back.position.set(WALL_X, tiers[0].y + backHeight / 2, BENCH_CENTER_Z);
-  group.add(back);
+  // 背もたれ（最上段は壁面に沿ったパネル）
+  const topBackH = 0.5;
+  const topBackGeo = new THREE.BoxGeometry(0.05, topBackH, BENCH_LENGTH);
+  const topBack = new THREE.Mesh(topBackGeo, benchMat);
+  topBack.position.set(WALL_X, tiers[0].y + topBackH / 2, BENCH_CENTER_Z);
+  group.add(topBack);
+
+  // 前面パネル（riser）: 各段の手前端から少し奥に引っ込んだ板
+  // 座面との隙間（スリット）からLEDの光が漏れる構造
+  const SLIT_GAP = 0.12; // riser下端と下段座面の隙間
+  const RISER_THICKNESS = 0.04;
+
+  for (let i = 0; i < tiers.length; i++) {
+    const t = tiers[i];
+    const riserTop = t.y - SEAT_THICKNESS; // riser上端（座面直下）
+    const riserBottom = ((i < tiers.length - 1) ? tiers[i + 1].y + SEAT_THICKNESS : 0.02) + SLIT_GAP;
+    const riserH = riserTop - riserBottom;
+    if (riserH <= 0) continue;
+
+    // riser は座面の手前端に揃える
+    const riserX = t.x - SEAT_WIDTH / 2;
+    const riserGeo = new THREE.BoxGeometry(RISER_THICKNESS, riserH, BENCH_LENGTH);
+    const riser = new THREE.Mesh(riserGeo, benchMat);
+    riser.position.set(riserX, riserBottom + riserH / 2, BENCH_CENTER_Z);
+    group.add(riser);
+  }
+
+  // ベンチ下 LED 間接照明（riser下端のスリットから光が漏れる）
+  const ledColor = 0xff9944;
+  tiers.forEach((t, idx) => {
+    // スリットの中間の高さ
+    const slitBottom = (idx < tiers.length - 1) ? tiers[idx + 1].y + SEAT_THICKNESS : 0.02;
+    const ledY = slitBottom + SLIT_GAP / 2;
+    const ledX = t.x - SEAT_WIDTH / 2 + 0.02; // riserのすぐ裏側
+    const ledCount = 4;
+    for (let i = 0; i < ledCount; i++) {
+      const z = BENCH_Z_START + 0.3 + (BENCH_LENGTH - 0.6) * (i / (ledCount - 1));
+      const light = new THREE.PointLight(ledColor, 0.2, 0.8);
+      light.position.set(ledX, ledY, z);
+      group.add(light);
+    }
+  });
 
   scene.add(group);
 }

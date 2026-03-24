@@ -9,19 +9,40 @@ const STATE = {
   LONG_BREAK: 'long_break',
 };
 
-const DEFAULT_MINUTES = {
-  [STATE.WORK]: 24,
-  [STATE.SHORT_BREAK]: 6,
-  [STATE.LONG_BREAK]: 12,
+const DEFAULTS = {
+  workMinutes: 24,
+  shortBreakMinutes: 6,
+  longBreakMinutes: 12,
+  longBreakInterval: 3,
+  autoStartBreaks: false,
+  autoStartPomodoros: false,
 };
 
-const SETS_BEFORE_LONG_BREAK = 3;
+const STORAGE_KEY = 'saunatimer-settings';
+
+/** localStorage から設定を読み込む */
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      return { ...DEFAULTS, ...saved };
+    }
+  } catch { /* ignore */ }
+  return { ...DEFAULTS };
+}
+
+/** localStorage に設定を保存する */
+function saveSettings(settings) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+}
 
 export class Pomodoro {
   constructor({ onTick, onStateChange, onComplete } = {}) {
+    this.settings = loadSettings();
     this.state = STATE.IDLE;
     this.completedSets = 0;
-    this.remainingMs = DEFAULT_MINUTES[STATE.WORK] * 60 * 1000;
+    this.remainingMs = this.settings.workMinutes * 60 * 1000;
     this.totalMs = this.remainingMs;
     this.running = false;
     this._lastTimestamp = null;
@@ -30,6 +51,19 @@ export class Pomodoro {
     this.onTick = onTick || (() => {});
     this.onStateChange = onStateChange || (() => {});
     this.onComplete = onComplete || (() => {});
+  }
+
+  /** 設定を更新する */
+  updateSettings(newSettings) {
+    this.settings = { ...this.settings, ...newSettings };
+    saveSettings(this.settings);
+
+    // IDLE 中なら表示時間も更新
+    if (this.state === STATE.IDLE) {
+      this.remainingMs = this.settings.workMinutes * 60 * 1000;
+      this.totalMs = this.remainingMs;
+      this.onTick(this.remainingMs, this.totalMs);
+    }
   }
 
   /** 開始 / 再開 */
@@ -66,7 +100,7 @@ export class Pomodoro {
     this.running = false;
     this.state = STATE.IDLE;
     this.completedSets = 0;
-    this.remainingMs = DEFAULT_MINUTES[STATE.WORK] * 60 * 1000;
+    this.remainingMs = this.settings.workMinutes * 60 * 1000;
     this.totalMs = this.remainingMs;
     this._lastTimestamp = null;
     this.onStateChange(this.state, this.completedSets);
@@ -106,17 +140,30 @@ export class Pomodoro {
     if (prevState === STATE.WORK || prevState === STATE.IDLE) {
       this.completedSets++;
 
-      if (this.completedSets >= SETS_BEFORE_LONG_BREAK) {
+      if (this.completedSets >= this.settings.longBreakInterval) {
         this._switchState(STATE.LONG_BREAK);
       } else {
         this._switchState(STATE.SHORT_BREAK);
+      }
+
+      // Auto Start Breaks
+      if (this.settings.autoStartBreaks) {
+        this.running = true;
+        this._lastTimestamp = performance.now();
       }
     } else {
       // 休憩終了 → IDLE に戻る（手動で次を開始）
       if (prevState === STATE.LONG_BREAK) {
         this.completedSets = 0;
       }
-      this._switchState(STATE.IDLE);
+
+      if (this.settings.autoStartPomodoros) {
+        this._switchState(STATE.WORK);
+        this.running = true;
+        this._lastTimestamp = performance.now();
+      } else {
+        this._switchState(STATE.IDLE);
+      }
     }
 
     this.onComplete(prevState, this.state, this.completedSets);
@@ -124,9 +171,14 @@ export class Pomodoro {
 
   _switchState(newState) {
     this.state = newState;
-    const minutes = newState === STATE.IDLE
-      ? DEFAULT_MINUTES[STATE.WORK]
-      : DEFAULT_MINUTES[newState];
+    const s = this.settings;
+    let minutes;
+    switch (newState) {
+      case STATE.WORK: minutes = s.workMinutes; break;
+      case STATE.SHORT_BREAK: minutes = s.shortBreakMinutes; break;
+      case STATE.LONG_BREAK: minutes = s.longBreakMinutes; break;
+      default: minutes = s.workMinutes;
+    }
     this.totalMs = minutes * 60 * 1000;
     this.remainingMs = this.totalMs;
     this.onStateChange(this.state, this.completedSets);

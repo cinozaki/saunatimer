@@ -42,6 +42,17 @@ export class PomodoroPanel {
       <div class="pomo-buttons">
         <button class="pomo-btn pomo-btn-main"></button>
         <button class="pomo-btn pomo-btn-skip">SKIP ▶▶</button>
+        <button class="pomo-btn pomo-btn-settings">⚙</button>
+      </div>
+      <div class="pomo-settings" style="display:none">
+        <div class="pomo-settings-title">Settings</div>
+        <label>Heating <input type="number" class="pomo-set-work" min="1" max="120"> min</label>
+        <label>Break <input type="number" class="pomo-set-break" min="1" max="60"> min</label>
+        <label>Long Break <input type="number" class="pomo-set-lbreak" min="1" max="60"> min</label>
+        <label>Long Break interval <input type="number" class="pomo-set-interval" min="1" max="10"></label>
+        <label><input type="checkbox" class="pomo-set-auto-break"> Auto Start Breaks</label>
+        <label><input type="checkbox" class="pomo-set-auto-pomo"> Auto Start Pomodoros</label>
+        <button class="pomo-btn pomo-btn-settings-close">OK</button>
       </div>
     `;
 
@@ -144,6 +155,54 @@ export class PomodoroPanel {
       .pomo-btn-skip.visible {
         display: inline-block;
       }
+      .pomo-btn-settings {
+        font-size: 16px;
+        padding: 6px 10px;
+      }
+      .pomo-settings {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #444;
+        text-align: left;
+      }
+      .pomo-settings-title {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: #aaa;
+        margin-bottom: 8px;
+        text-align: center;
+      }
+      .pomo-settings label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        margin-bottom: 6px;
+        color: #ccc;
+        gap: 8px;
+      }
+      .pomo-settings input[type="number"] {
+        width: 50px;
+        background: #222;
+        color: #fff;
+        border: 1px solid #555;
+        border-radius: 4px;
+        padding: 3px 6px;
+        font-size: 13px;
+        text-align: center;
+        font-family: 'Overpass', monospace;
+      }
+      .pomo-settings input[type="checkbox"] {
+        accent-color: #ff6633;
+        width: 16px;
+        height: 16px;
+      }
+      .pomo-btn-settings-close {
+        width: 100%;
+        margin-top: 8px;
+        background: #ff6633;
+      }
     `;
 
     document.head.appendChild(style);
@@ -175,6 +234,25 @@ export class PomodoroPanel {
       this._onSessionStop();
     });
 
+    // 設定パネルの開閉
+    const settingsPanel = container.querySelector('.pomo-settings');
+    container.querySelector('.pomo-btn-settings').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const visible = settingsPanel.style.display !== 'none';
+      if (visible) {
+        settingsPanel.style.display = 'none';
+      } else {
+        this._loadSettingsToUI();
+        settingsPanel.style.display = 'block';
+      }
+    });
+
+    container.querySelector('.pomo-btn-settings-close').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._applySettingsFromUI();
+      settingsPanel.style.display = 'none';
+    });
+
     // タッチイベントがcanvasに伝播しないように
     container.addEventListener('click', (e) => e.stopPropagation());
     container.addEventListener('touchend', (e) => e.stopPropagation());
@@ -186,6 +264,13 @@ export class PomodoroPanel {
       dots: container.querySelector('.pomo-dots'),
       btnMain: container.querySelector('.pomo-btn-main'),
       btnSkip: container.querySelector('.pomo-btn-skip'),
+      settingsPanel,
+      setWork: container.querySelector('.pomo-set-work'),
+      setBreak: container.querySelector('.pomo-set-break'),
+      setLBreak: container.querySelector('.pomo-set-lbreak'),
+      setInterval: container.querySelector('.pomo-set-interval'),
+      setAutoBreak: container.querySelector('.pomo-set-auto-break'),
+      setAutoPomo: container.querySelector('.pomo-set-auto-pomo'),
     };
 
     // ファビコン用 Canvas
@@ -220,7 +305,8 @@ export class PomodoroPanel {
 
     // セットドット
     el.dots.innerHTML = '';
-    for (let i = 0; i < 3; i++) {
+    const interval = pomo.settings.longBreakInterval;
+    for (let i = 0; i < interval; i++) {
       const dot = document.createElement('div');
       dot.className = 'pomo-dot' + (i < pomo.completedSets ? ' filled' : '');
       el.dots.appendChild(dot);
@@ -304,12 +390,37 @@ export class PomodoroPanel {
     this._faviconLink.href = canvas.toDataURL('image/png');
   }
 
+  _loadSettingsToUI() {
+    const s = this.pomodoro.settings;
+    this._el.setWork.value = s.workMinutes;
+    this._el.setBreak.value = s.shortBreakMinutes;
+    this._el.setLBreak.value = s.longBreakMinutes;
+    this._el.setInterval.value = s.longBreakInterval;
+    this._el.setAutoBreak.checked = s.autoStartBreaks;
+    this._el.setAutoPomo.checked = s.autoStartPomodoros;
+  }
+
+  _applySettingsFromUI() {
+    this.pomodoro.updateSettings({
+      workMinutes: Math.max(1, parseInt(this._el.setWork.value) || 24),
+      shortBreakMinutes: Math.max(1, parseInt(this._el.setBreak.value) || 6),
+      longBreakMinutes: Math.max(1, parseInt(this._el.setLBreak.value) || 12),
+      longBreakInterval: Math.max(1, parseInt(this._el.setInterval.value) || 3),
+      autoStartBreaks: this._el.setAutoBreak.checked,
+      autoStartPomodoros: this._el.setAutoPomo.checked,
+    });
+    this._render();
+  }
+
   _onPhaseComplete(prevState, nextState) {
     this._render();
     this._notifyPhaseChange(prevState, nextState);
 
-    // HEATING以外に遷移したら時計を停止（スイープで通常時刻に戻る）
-    if (nextState !== STATE.WORK) {
+    if (nextState === STATE.WORK && this.pomodoro.running) {
+      // Auto Start Pomodoros でワークが自動開始された
+      this._onSessionStart();
+    } else if (nextState !== STATE.WORK) {
+      // HEATING以外に遷移したら時計を停止（スイープで通常時刻に戻る）
       this._onSessionStop();
     }
   }
@@ -317,11 +428,12 @@ export class PomodoroPanel {
   _notifyPhaseChange(prevState, nextState) {
     if ('Notification' in window && Notification.permission === 'granted') {
       const title = nextState === STATE.WORK ? 'Heating Time' : 'Break Time';
+      const s = this.pomodoro.settings;
       const body = nextState === STATE.WORK
         ? 'サウナに入りましょう'
         : nextState === STATE.LONG_BREAK
-          ? 'ロング休憩です（12分）'
-          : '短い休憩です（6分）';
+          ? `ロング休憩です（${s.longBreakMinutes}分）`
+          : `短い休憩です（${s.shortBreakMinutes}分）`;
       new Notification(title, { body });
     }
     this._playNotificationSound();

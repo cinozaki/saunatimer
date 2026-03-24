@@ -349,17 +349,41 @@ function _createSunLounger() {
     lounger.add(slat);
   }
 
-  // --- 背もたれ（角度付きのスラット） ---
+  // --- 背もたれフレーム（左右のサイドレール + 上端バー） ---
+  const backTopY = BED_H + Math.sin(BACK_ANGLE) * BACK_L;
+  const backTopZ = -BED_L / 2;
+  const backBottomZ = -BED_L / 2 + BACK_L;
+  const sideLen = BACK_L / Math.cos(BACK_ANGLE);
+
+  [-1, 1].forEach((side) => {
+    const sideGeo = new THREE.BoxGeometry(0.03, 0.04, sideLen);
+    const sideRail = new THREE.Mesh(sideGeo, frameMat);
+    sideRail.position.set(
+      side * BED_W / 2,
+      BED_H + Math.sin(BACK_ANGLE) * BACK_L / 2,
+      -BED_L / 2 + BACK_L / 2
+    );
+    sideRail.rotation.x = -BACK_ANGLE;
+    lounger.add(sideRail);
+  });
+
+  // 上端バー
+  const topBarGeo = new THREE.BoxGeometry(BED_W, 0.04, 0.03);
+  const topBar = new THREE.Mesh(topBarGeo, frameMat);
+  topBar.position.set(0, backTopY, backTopZ);
+  topBar.rotation.x = -BACK_ANGLE;
+  lounger.add(topBar);
+
+  // --- 背もたれスラット ---
   const backSlats = 5;
-  const backSpacing = BACK_L / backSlats;
   for (let i = 0; i < backSlats; i++) {
+    const t = (i + 0.5) / backSlats;
     const geo = new THREE.BoxGeometry(BED_W - 0.06, SLAT_T, 0.04);
     const slat = new THREE.Mesh(geo, frameMat);
-    const localZ = i * backSpacing;
     slat.position.set(
       0,
-      BED_H + SLAT_T / 2 + Math.sin(BACK_ANGLE) * (BACK_L - localZ),
-      -BED_L / 2 + localZ
+      BED_H + Math.sin(BACK_ANGLE) * BACK_L * (1 - t),
+      -BED_L / 2 + BACK_L * t
     );
     slat.rotation.x = -BACK_ANGLE;
     lounger.add(slat);

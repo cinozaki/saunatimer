@@ -66,6 +66,11 @@ export function buildChillSpace(scene) {
   waterLight.position.set(ORIGIN_X, 0.5, -SPACE_DEPTH / 2 + 0.8);
   group.add(waterLight);
 
+  // 窓際の光（サウナ室から窓越しにチルスペースが見えるように）
+  const windowLight = new THREE.PointLight(0xeeddcc, 0.8, 6);
+  windowLight.position.set(ORIGIN_X + SPACE_WIDTH / 2 - 0.3, 1.5, (-SPACE_DEPTH / 2 + 0.3 + 0.45) / 2);
+  group.add(windowLight);
+
   scene.add(group);
 }
 
@@ -132,6 +137,71 @@ function _buildWalls(group) {
   left.rotation.y = Math.PI / 2;
   left.position.set(ORIGIN_X - SPACE_WIDTH / 2, SPACE_HEIGHT / 2, 0);
   group.add(left);
+
+  // 右壁（サウナ室との境界、横長窓付き）
+  const RIGHT_X = ORIGIN_X + SPACE_WIDTH / 2; // = -2
+  const WIN_BOTTOM = 1.2;
+  const WIN_TOP = 1.8;
+  const WIN_H = WIN_TOP - WIN_BOTTOM;
+  const DOOR_EDGE_Z = 0.45;
+  const WIN_Z_START = -SPACE_DEPTH / 2 + 0.3;
+  const WIN_W = DOOR_EDGE_Z - WIN_Z_START;
+  const WIN_CENTER_Z = (WIN_Z_START + DOOR_EDGE_Z) / 2;
+
+  // 窓より下の壁
+  const rWallBottomGeo = new THREE.PlaneGeometry(SPACE_DEPTH, WIN_BOTTOM);
+  const rWallBottom = new THREE.Mesh(rWallBottomGeo, wallMat);
+  rWallBottom.rotation.y = -Math.PI / 2;
+  rWallBottom.position.set(RIGHT_X, WIN_BOTTOM / 2, 0);
+  group.add(rWallBottom);
+
+  // 窓より上の壁
+  const rUpperH = SPACE_HEIGHT - WIN_TOP;
+  const rWallTopGeo = new THREE.PlaneGeometry(SPACE_DEPTH, rUpperH);
+  const rWallTop = new THREE.Mesh(rWallTopGeo, wallMat);
+  rWallTop.rotation.y = -Math.PI / 2;
+  rWallTop.position.set(RIGHT_X, WIN_TOP + rUpperH / 2, 0);
+  group.add(rWallTop);
+
+  // 窓の左パネル（奥壁側）
+  const rLeftPanelW = WIN_Z_START - (-SPACE_DEPTH / 2);
+  if (rLeftPanelW > 0) {
+    const geo = new THREE.PlaneGeometry(rLeftPanelW, WIN_H);
+    const panel = new THREE.Mesh(geo, wallMat);
+    panel.rotation.y = -Math.PI / 2;
+    panel.position.set(RIGHT_X, WIN_BOTTOM + WIN_H / 2, -SPACE_DEPTH / 2 + rLeftPanelW / 2);
+    group.add(panel);
+  }
+
+  // 窓の右パネル（ドア側〜手前端）
+  const rRightPanelW = SPACE_DEPTH / 2 - DOOR_EDGE_Z;
+  if (rRightPanelW > 0) {
+    const geo = new THREE.PlaneGeometry(rRightPanelW, WIN_H);
+    const panel = new THREE.Mesh(geo, wallMat);
+    panel.rotation.y = -Math.PI / 2;
+    panel.position.set(RIGHT_X, WIN_BOTTOM + WIN_H / 2, DOOR_EDGE_Z + rRightPanelW / 2);
+    group.add(panel);
+  }
+
+  // 窓枠
+  const frameMat = new THREE.MeshStandardMaterial({
+    color: 0x4a3828,
+    roughness: 0.7,
+    metalness: 0.05,
+  });
+  const frameT = 0.035;
+  [WIN_BOTTOM, WIN_TOP].forEach((fy) => {
+    const geo = new THREE.BoxGeometry(frameT, frameT, WIN_W + frameT * 2);
+    const frame = new THREE.Mesh(geo, frameMat);
+    frame.position.set(RIGHT_X, fy, WIN_CENTER_Z);
+    group.add(frame);
+  });
+  [WIN_Z_START, DOOR_EDGE_Z].forEach((fz) => {
+    const geo = new THREE.BoxGeometry(frameT, WIN_H + frameT * 2, frameT);
+    const frame = new THREE.Mesh(geo, frameMat);
+    frame.position.set(RIGHT_X, WIN_BOTTOM + WIN_H / 2, fz);
+    group.add(frame);
+  });
 
   // 屋根（奥半分のみ、手前は空）
   const roofGeo = new THREE.PlaneGeometry(SPACE_WIDTH, SPACE_DEPTH * 0.4);

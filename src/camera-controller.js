@@ -13,7 +13,14 @@ const VIEWS = {
     position: new THREE.Vector3(-4.5, 1.4, 2.2),
     lookAt: new THREE.Vector3(-5.5, 0.6, -0.3),
   },
+  chillOverview: {
+    position: new THREE.Vector3(-5.0, 4.5, 3.0),
+    lookAt: new THREE.Vector3(-5.0, 0.3, -0.5),
+  },
 };
+
+// サウナ室ビューとチルスペースビューのグループ
+const CHILL_VIEWS = ['chill', 'chillOverview'];
 
 const TRANSITION_DURATION = 1.0; // 秒
 
@@ -34,13 +41,14 @@ export class CameraController {
     camera.lookAt(VIEWS.front.lookAt);
   }
 
-  /** サウナ室内の正面/俯瞰をトグル */
+  /** 同じエリア内でビューをトグル（サウナ室: front⇔overview、チル: chill⇔chillOverview） */
   toggle() {
     if (this._transitioning) return;
-    if (this._currentView === 'front') {
-      this.moveTo('overview');
+
+    if (CHILL_VIEWS.includes(this._currentView)) {
+      this.moveTo(this._currentView === 'chill' ? 'chillOverview' : 'chill');
     } else {
-      this.moveTo('front');
+      this.moveTo(this._currentView === 'front' ? 'overview' : 'front');
     }
   }
 

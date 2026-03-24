@@ -1,24 +1,27 @@
-# saunatimer
+# Sauna Timer
 
-## Project setup
-```
+Vue 3 で作ったサウナ用アナログ時計アプリ。
+
+## Setup
+
+```bash
 npm install
 ```
 
-### Compiles and hot-reloads for development
-```
-npm run serve
+## Development
+
+```bash
+npm run serve   # http://localhost:3003
 ```
 
-### Compiles and minifies for production
-```
-npm run build
+## Build
+
+```bash
+npm run build   # dist/ に出力
 ```
 
-### Lints and fixes files
-```
+## Lint
+
+```bash
 npm run lint
 ```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).

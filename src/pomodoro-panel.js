@@ -445,14 +445,14 @@ export class PomodoroPanel {
       ctx.fillStyle = bgColor;
       ctx.fill();
 
-      // 進捗アーク（残り時間を表示、上から時計回り）
+      // 進捗アーク（残り時間を表示、上から時計回りに消えていく）
       const remaining = 1 - pomo.progress;
       if (remaining > 0) {
         ctx.beginPath();
         ctx.moveTo(size / 2, size / 2);
         ctx.arc(size / 2, size / 2, 28,
-          -Math.PI / 2,
-          -Math.PI / 2 + remaining * Math.PI * 2);
+          -Math.PI / 2 + (1 - remaining) * Math.PI * 2,
+          -Math.PI / 2 + Math.PI * 2);
         ctx.closePath();
         ctx.fillStyle = color;
         ctx.fill();

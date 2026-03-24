@@ -37,8 +37,9 @@ export class ClockTexture {
     const second = now.getSeconds();
     const ms = now.getMilliseconds();
 
-    const minuteAngle = (minute * DEG_PER_HOUR + second / 2 + ms / 2000) * (Math.PI / 180) - Math.PI / 2;
-    const secondAngle = (second * DEG_PER_SECOND + DEG_PER_SECOND * ms / 1000) * (Math.PI / 180) - Math.PI / 2;
+    const minute12 = minute % 12;
+    const minuteAngle = (minute12 * DEG_PER_HOUR + second / 2 + ms / 2000) * (Math.PI / 180);
+    const secondAngle = (second * DEG_PER_SECOND + DEG_PER_SECOND * ms / 1000) * (Math.PI / 180);
 
     ctx.clearRect(0, 0, CLOCK_SIZE, CLOCK_SIZE);
 

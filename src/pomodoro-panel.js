@@ -35,14 +35,16 @@ export class PomodoroPanel {
     const container = document.createElement('div');
     container.id = 'pomodoro';
     container.innerHTML = `
+      <button class="pomo-collapse-btn"><span class="material-symbols-rounded">expand_less</span></button>
+      <div class="pomo-body">
       <div class="pomo-label"></div>
       <div class="pomo-time"></div>
       <div class="pomo-bar-bg"><div class="pomo-bar-fill"></div></div>
       <div class="pomo-dots"></div>
       <div class="pomo-buttons">
         <button class="pomo-btn pomo-btn-main"></button>
-        <button class="pomo-btn pomo-btn-skip">SKIP ▶▶</button>
-        <button class="pomo-btn pomo-btn-settings">⚙</button>
+        <button class="pomo-btn pomo-btn-skip"><span class="material-symbols-rounded">skip_next</span></button>
+        <button class="pomo-btn pomo-btn-settings"><span class="material-symbols-rounded">settings</span></button>
       </div>
       <div class="pomo-settings" style="display:none">
         <div class="pomo-settings-title">Settings</div>
@@ -51,8 +53,9 @@ export class PomodoroPanel {
         <label>Long Break <input type="number" class="pomo-set-lbreak" min="1" max="60"> min</label>
         <label>Long Break interval <input type="number" class="pomo-set-interval" min="1" max="10"></label>
         <label><input type="checkbox" class="pomo-set-auto-break"> Auto Start Breaks</label>
-        <label><input type="checkbox" class="pomo-set-auto-pomo"> Auto Start Pomodoros</label>
+        <label><input type="checkbox" class="pomo-set-auto-pomo"> Auto Start Heating</label>
         <button class="pomo-btn pomo-btn-settings-close">OK</button>
+      </div>
       </div>
     `;
 
@@ -65,13 +68,70 @@ export class PomodoroPanel {
         transform: translateX(-50%);
         background: rgba(0, 0, 0, 0.85);
         color: #fff;
-        padding: 12px 28px 14px;
         border-radius: 0 0 12px 12px;
         text-align: center;
         font-family: 'Overpass', sans-serif;
         z-index: 10;
-        min-width: 240px;
+        width: 280px;
         user-select: none;
+        overflow: hidden;
+      }
+      .pomo-body {
+        padding: 12px 28px 14px;
+        max-height: 500px;
+        overflow: hidden;
+        transition: max-height 0.35s ease, padding 0.35s ease, opacity 0.25s ease;
+        opacity: 1;
+      }
+      #pomodoro.collapsed .pomo-body {
+        max-height: 0;
+        padding: 0 28px;
+        opacity: 0;
+      }
+      .material-symbols-rounded {
+        font-family: 'Material Symbols Rounded';
+        font-weight: normal;
+        font-style: normal;
+        font-size: inherit;
+        vertical-align: middle;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+        -webkit-font-smoothing: antialiased;
+      }
+      .pomo-collapse-btn {
+        display: block;
+        width: 100%;
+        background: none;
+        border: none;
+        color: #666;
+        font-size: 18px;
+        cursor: pointer;
+        padding: 2px 0;
+        line-height: 1;
+        transition: padding 0.3s ease;
+      }
+      .pomo-collapse-btn:hover {
+        color: #aaa;
+      }
+      #pomodoro.collapsed {
+        opacity: 0.4;
+        transition: opacity 0.3s ease;
+      }
+      #pomodoro.collapsed:hover {
+        opacity: 1;
+      }
+      #pomodoro.collapsed .pomo-collapse-btn {
+        padding: 4px 0;
+      }
+      .pomo-btn .material-symbols-rounded {
+        font-size: 16px;
+      }
+      .pomo-btn-settings .material-symbols-rounded {
+        font-size: 18px;
       }
       .pomo-label {
         font-size: 13px;
@@ -156,7 +216,9 @@ export class PomodoroPanel {
         display: inline-block;
       }
       .pomo-btn-settings {
-        font-size: 16px;
+        padding: 6px 10px;
+      }
+      .pomo-btn-skip {
         padding: 6px 10px;
       }
       .pomo-settings {
@@ -232,6 +294,16 @@ export class PomodoroPanel {
       this._render();
       // SKIP 後は常に時計を停止（BREAK or IDLE）
       this._onSessionStop();
+    });
+
+    // パネル折りたたみ
+    const collapseBtn = container.querySelector('.pomo-collapse-btn');
+    collapseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const collapsed = container.classList.toggle('collapsed');
+      collapseBtn.innerHTML = collapsed
+        ? '<span class="material-symbols-rounded">expand_more</span>'
+        : '<span class="material-symbols-rounded">expand_less</span>';
     });
 
     // 設定パネルの開閉
@@ -314,13 +386,13 @@ export class PomodoroPanel {
 
     // ボタン
     if (isIdle) {
-      el.btnMain.textContent = 'START ▶';
+      el.btnMain.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> START';
       el.btnMain.className = 'pomo-btn pomo-btn-main start';
     } else if (pomo.running) {
-      el.btnMain.textContent = 'PAUSE ⏸';
+      el.btnMain.innerHTML = '<span class="material-symbols-rounded">pause</span> PAUSE';
       el.btnMain.className = 'pomo-btn pomo-btn-main pause';
     } else {
-      el.btnMain.textContent = 'START ▶';
+      el.btnMain.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> START';
       el.btnMain.className = 'pomo-btn pomo-btn-main start';
     }
 

@@ -336,17 +336,19 @@ function buildBucket(scene) {
 }
 
 /**
- * サウナ室左壁のウッドドア（丸窓付き）
+ * サウナ室左壁のウッドドア（両面から見える）
  */
 function buildDoor(scene) {
-  const WALL_X = -1.99; // 左壁の内側表面に重ねる
+  const WALL_CENTER_X = -2.0;
+  const WALL_T = 0.12;
   const DOOR_Z = 1.2;
   const DOOR_W = 0.85;
   const DOOR_H = 2.05;
+  const DOOR_T = 0.06;
 
   const group = new THREE.Group();
 
-  // ドアパネル（木目テクスチャ）
+  // ドアパネル（木目テクスチャ、厚みあり）
   const doorTexture = createWoodTexture({
     width: 256,
     height: 512,
@@ -359,92 +361,96 @@ function buildDoor(scene) {
     roughness: 0.8,
     metalness: 0.0,
   });
-  const doorGeo = new THREE.PlaneGeometry(DOOR_W, DOOR_H);
+  const doorGeo = new THREE.BoxGeometry(DOOR_T, DOOR_H, DOOR_W);
   const door = new THREE.Mesh(doorGeo, doorMat);
-  door.rotation.y = Math.PI / 2;
-  door.position.set(WALL_X, DOOR_H / 2 + 0.02, DOOR_Z);
+  door.position.set(WALL_CENTER_X, DOOR_H / 2 + 0.02, DOOR_Z);
   group.add(door);
 
-  // ドア枠
+  // ドア枠（壁の厚みを貫通）
   const frameMat = new THREE.MeshStandardMaterial({
     color: 0x5a3518,
     roughness: 0.7,
     metalness: 0.0,
   });
-  const frameThick = 0.06;
-  // 上枠
-  const topGeo = new THREE.BoxGeometry(frameThick, 0.06, DOOR_W + frameThick * 2);
+  const frameW = 0.06;
+  const topGeo = new THREE.BoxGeometry(WALL_T + 0.02, frameW, DOOR_W + frameW * 2);
   const topFrame = new THREE.Mesh(topGeo, frameMat);
-  topFrame.position.set(WALL_X, DOOR_H + 0.05, DOOR_Z);
+  topFrame.position.set(WALL_CENTER_X, DOOR_H + 0.05, DOOR_Z);
   group.add(topFrame);
-  // 左枠
-  const sideGeo = new THREE.BoxGeometry(frameThick, DOOR_H + 0.06, 0.06);
+  const sideGeo = new THREE.BoxGeometry(WALL_T + 0.02, DOOR_H + 0.06, frameW);
   const leftFrame = new THREE.Mesh(sideGeo, frameMat);
-  leftFrame.position.set(WALL_X, DOOR_H / 2 + 0.02, DOOR_Z - DOOR_W / 2 - 0.03);
+  leftFrame.position.set(WALL_CENTER_X, DOOR_H / 2 + 0.02, DOOR_Z - DOOR_W / 2 - frameW / 2);
   group.add(leftFrame);
-  // 右枠
   const rightFrame = new THREE.Mesh(sideGeo, frameMat);
-  rightFrame.position.set(WALL_X, DOOR_H / 2 + 0.02, DOOR_Z + DOOR_W / 2 + 0.03);
+  rightFrame.position.set(WALL_CENTER_X, DOOR_H / 2 + 0.02, DOOR_Z + DOOR_W / 2 + frameW / 2);
   group.add(rightFrame);
 
-  // 丸窓（ドア上部）
-  const WINDOW_Y = 1.5;
-  const WINDOW_R = 0.15;
-  // 窓枠（トーラス）
-  const windowFrameGeo = new THREE.TorusGeometry(WINDOW_R, 0.015, 8, 24);
-  const windowFrameMat = new THREE.MeshStandardMaterial({
-    color: 0x888888,
-    roughness: 0.3,
-    metalness: 0.7,
-  });
-  const windowFrame = new THREE.Mesh(windowFrameGeo, windowFrameMat);
-  windowFrame.rotation.y = Math.PI / 2;
-  windowFrame.position.set(WALL_X - 0.01, WINDOW_Y, DOOR_Z);
-  group.add(windowFrame);
-
-  // 窓ガラス（半透明の円）
-  const glassMat = new THREE.MeshStandardMaterial({
-    color: 0xaaccdd,
-    roughness: 0.05,
-    metalness: 0.2,
-    transparent: true,
-    opacity: 0.4,
-  });
-  const glassGeo = new THREE.CircleGeometry(WINDOW_R - 0.01, 24);
-  const glass = new THREE.Mesh(glassGeo, glassMat);
-  glass.rotation.y = Math.PI / 2;
-  glass.position.set(WALL_X - 0.015, WINDOW_Y, DOOR_Z);
-  group.add(glass);
-
-  // 四角い取手（コの字型ハンドル、両面）
+  // スクエア型取手（両面）
   const handleMat = new THREE.MeshStandardMaterial({
     color: 0xaaaaaa,
     roughness: 0.3,
     metalness: 0.8,
   });
-  const HANDLE_W = 0.02;   // 断面の太さ
-  const HANDLE_H = 0.12;   // 握り部分の長さ（縦）
-  const HANDLE_D = 0.04;   // 壁からの出っ張り
+  const HANDLE_BAR = 0.025;
+  const HANDLE_H = 0.18;
+  const HANDLE_D = 0.06;
   const HANDLE_Z = DOOR_Z - 0.3;
   const HANDLE_Y = 1.0;
 
-  const gripGeo = new THREE.BoxGeometry(HANDLE_D, HANDLE_H, HANDLE_W);
-  const bracketGeo = new THREE.BoxGeometry(HANDLE_D, HANDLE_W, HANDLE_W);
+  const gripGeo = new THREE.BoxGeometry(HANDLE_D, HANDLE_H, HANDLE_BAR);
+  const bracketGeo = new THREE.BoxGeometry(HANDLE_D, HANDLE_BAR, HANDLE_BAR);
 
-  // 外側（チルスペース側）・内側（サウナ室側）両方に取手
-  [-(0.02 + HANDLE_D / 2), (0.02 + HANDLE_D / 2)].forEach((dx) => {
+  const innerX = WALL_CENTER_X + WALL_T / 2;
+  const outerX = WALL_CENTER_X - WALL_T / 2;
+  [innerX + 0.02 + HANDLE_D / 2, outerX - 0.02 - HANDLE_D / 2].forEach((hx) => {
     const grip = new THREE.Mesh(gripGeo, handleMat);
-    grip.position.set(WALL_X + dx, HANDLE_Y, HANDLE_Z);
+    grip.position.set(hx, HANDLE_Y, HANDLE_Z);
     group.add(grip);
 
     const topBracket = new THREE.Mesh(bracketGeo, handleMat);
-    topBracket.position.set(WALL_X + dx, HANDLE_Y + HANDLE_H / 2 - HANDLE_W / 2, HANDLE_Z);
+    topBracket.position.set(hx, HANDLE_Y + HANDLE_H / 2 - HANDLE_BAR / 2, HANDLE_Z);
     group.add(topBracket);
 
     const bottomBracket = new THREE.Mesh(bracketGeo, handleMat);
-    bottomBracket.position.set(WALL_X + dx, HANDLE_Y - HANDLE_H / 2 + HANDLE_W / 2, HANDLE_Z);
+    bottomBracket.position.set(hx, HANDLE_Y - HANDLE_H / 2 + HANDLE_BAR / 2, HANDLE_Z);
     group.add(bottomBracket);
   });
+
+  // チルスペース側ドア上のブラケットライト
+  const lightX = outerX - 0.01;
+  const lightY = DOOR_H + 0.25;
+  const lightZ = DOOR_Z;
+
+  const bracketPlateMat = new THREE.MeshStandardMaterial({
+    color: 0x222222,
+    roughness: 0.3,
+    metalness: 0.9,
+  });
+  const plateGeo = new THREE.BoxGeometry(0.02, 0.12, 0.08);
+  const plate = new THREE.Mesh(plateGeo, bracketPlateMat);
+  plate.position.set(lightX, lightY, lightZ);
+  group.add(plate);
+
+  const armGeo = new THREE.BoxGeometry(0.10, 0.02, 0.02);
+  const arm = new THREE.Mesh(armGeo, bracketPlateMat);
+  arm.position.set(lightX - 0.06, lightY + 0.04, lightZ);
+  group.add(arm);
+
+  const shadeMat = new THREE.MeshStandardMaterial({
+    color: 0x333333,
+    roughness: 0.4,
+    metalness: 0.7,
+  });
+  const shadeGeo = new THREE.BoxGeometry(0.10, 0.10, 0.08);
+  const shade = new THREE.Mesh(shadeGeo, shadeMat);
+  shade.position.set(lightX - 0.10, lightY - 0.01, lightZ);
+  group.add(shade);
+
+  const bracketLight = new THREE.SpotLight(0xffcc88, 1.5, 3, Math.PI / 4, 0.6);
+  bracketLight.position.set(lightX - 0.10, lightY - 0.06, lightZ);
+  bracketLight.target.position.set(lightX - 0.10, 0, lightZ);
+  group.add(bracketLight);
+  group.add(bracketLight.target);
 
   scene.add(group);
 }

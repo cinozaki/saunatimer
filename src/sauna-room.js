@@ -50,10 +50,11 @@ export function buildSaunaRoom(scene) {
   });
 
   // 部屋を BoxGeometry の内側 (BackSide) で構成
-  // 各面に異なるマテリアルを割り当て: +x, -x, +y, -y, +z, -z
+  // 左壁（-x）は窓を開けるので削除し、個別パネルで構築
+  const transparentMat = new THREE.MeshBasicMaterial({ visible: false });
   const materials = [
     wallMaterial,     // +x (右壁)
-    wallMaterial,     // -x (左壁)
+    transparentMat,   // -x (左壁 → 個別構築)
     ceilingMaterial,  // +y (天井)
     floorMaterial,    // -y (床)
     wallMaterial,     // +z (奥壁)
@@ -61,9 +62,95 @@ export function buildSaunaRoom(scene) {
   ];
 
   const roomGeometry = new THREE.BoxGeometry(ROOM_WIDTH, ROOM_HEIGHT, ROOM_DEPTH);
+  // 左壁（materialIndex=1）の三角形を削除
+  roomGeometry.groups = roomGeometry.groups.filter(g => g.materialIndex !== 1);
   const room = new THREE.Mesh(roomGeometry, materials);
   room.position.set(0, ROOM_HEIGHT / 2, 0);
   scene.add(room);
+
+  // --- 左壁（窓付き、厚みあり） ---
+  const LEFT_X = -ROOM_WIDTH / 2;
+  const WALL_T = 0.12;
+  const WIN_BOTTOM = 1.2;
+  const WIN_TOP = 1.8;
+  const WIN_H = WIN_TOP - WIN_BOTTOM;
+  const DOOR_EDGE_Z = 0.45;
+  const WIN_Z_START = -ROOM_DEPTH / 2 + 0.3;
+  const WIN_W = DOOR_EDGE_Z - WIN_Z_START;
+  const WIN_CENTER_Z = (WIN_Z_START + DOOR_EDGE_Z) / 2;
+
+  const wallMatInner = new THREE.MeshStandardMaterial({
+    map: wallTexture,
+    roughness: 0.9,
+    metalness: 0.0,
+    side: THREE.DoubleSide,
+  });
+
+  // 壁パネル（窓より下 — 全幅）
+  const lWallBottomGeo = new THREE.BoxGeometry(WALL_T, WIN_BOTTOM, ROOM_DEPTH);
+  const lWallBottom = new THREE.Mesh(lWallBottomGeo, wallMatInner);
+  lWallBottom.position.set(LEFT_X, WIN_BOTTOM / 2, 0);
+  scene.add(lWallBottom);
+
+  // 壁パネル（窓より上 — 全幅）
+  const upperH = ROOM_HEIGHT - WIN_TOP;
+  const lWallTopGeo = new THREE.BoxGeometry(WALL_T, upperH, ROOM_DEPTH);
+  const lWallTop = new THREE.Mesh(lWallTopGeo, wallMatInner);
+  lWallTop.position.set(LEFT_X, WIN_TOP + upperH / 2, 0);
+  scene.add(lWallTop);
+
+  // 窓の左パネル（奥壁側）
+  const leftPanelW = WIN_Z_START - (-ROOM_DEPTH / 2);
+  if (leftPanelW > 0) {
+    const geo = new THREE.BoxGeometry(WALL_T, WIN_H, leftPanelW);
+    const panel = new THREE.Mesh(geo, wallMatInner);
+    panel.position.set(LEFT_X, WIN_BOTTOM + WIN_H / 2, -ROOM_DEPTH / 2 + leftPanelW / 2);
+    scene.add(panel);
+  }
+
+  // 窓の右パネル（ドア側〜手前壁）
+  const rightPanelW = ROOM_DEPTH / 2 - DOOR_EDGE_Z;
+  if (rightPanelW > 0) {
+    const geo = new THREE.BoxGeometry(WALL_T, WIN_H, rightPanelW);
+    const panel = new THREE.Mesh(geo, wallMatInner);
+    panel.position.set(LEFT_X, WIN_BOTTOM + WIN_H / 2, DOOR_EDGE_Z + rightPanelW / 2);
+    scene.add(panel);
+  }
+
+  // 窓ガラス
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0xaaccdd,
+    roughness: 0.05,
+    metalness: 0.15,
+    transparent: true,
+    opacity: 0.3,
+    side: THREE.DoubleSide,
+  });
+  const glassGeo = new THREE.PlaneGeometry(WIN_W, WIN_H);
+  const glass = new THREE.Mesh(glassGeo, glassMat);
+  glass.rotation.y = Math.PI / 2;
+  glass.position.set(LEFT_X, WIN_BOTTOM + WIN_H / 2, WIN_CENTER_Z);
+  scene.add(glass);
+
+  // 窓枠
+  const frameMat = new THREE.MeshStandardMaterial({
+    color: 0x5a3518,
+    roughness: 0.7,
+    metalness: 0.05,
+  });
+  const frameT = 0.035;
+  [WIN_BOTTOM, WIN_TOP].forEach((fy) => {
+    const geo = new THREE.BoxGeometry(frameT, frameT, WIN_W + frameT * 2);
+    const frame = new THREE.Mesh(geo, frameMat);
+    frame.position.set(LEFT_X, fy, WIN_CENTER_Z);
+    scene.add(frame);
+  });
+  [WIN_Z_START, DOOR_EDGE_Z].forEach((fz) => {
+    const geo = new THREE.BoxGeometry(frameT, WIN_H + frameT * 2, frameT);
+    const frame = new THREE.Mesh(geo, frameMat);
+    frame.position.set(LEFT_X, WIN_BOTTOM + WIN_H / 2, fz);
+    scene.add(frame);
+  });
 
   // --- ライティング ---
 

@@ -2,11 +2,11 @@
   <div class="saunatimer">
     <div class="saunatimer__logo">SAUNA</div>
     <div class="saunatimer__circle"></div>
-    <div class="saunatimer__second" :style="{transform:secondRotateDeg}"></div>
-    <div class="saunatimer__minute" :style="{transform:minuteRotateDeg}"></div>
-    <b class="hour" v-for="h in timeList" :key="h">
+    <div class="saunatimer__second" :style="{transform: secondRotateDeg}"></div>
+    <div class="saunatimer__minute" :style="{transform: minuteRotateDeg}"></div>
+    <b class="hour" v-for="h in HOUR_LIST" :key="h">
       <span>
-        <i :style="{transform:transform}">{{h}}</i>
+        <i>{{ h }}</i>
       </span>
     </b>
     <div class="saunatimer__title">12min</div>
@@ -14,44 +14,44 @@
 </template>
 
 <script>
-export default {
-  data () {
-      return {
-          timeList: [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-          secondRotateDeg: 'rotateZ(360deg)',
-          minuteRotateDeg: 'rotateZ(0deg)',
-          transform: 1
-      };
-    },
-    // watch: {
-    //   time() {
-    //     this.show();
-    //   }
-    // },
-    methods: {
-      show() {
-        this.showTime();
-        this._timer = setInterval(()=> {
-          this.showTime();
-        }, 100);
-      },
-      showTime() {
-        let times;
-        const now = new Date();
-        times = [now.getMinutes(), now.getSeconds(), now.getMilliseconds()];
+const DEG_PER_HOUR = 30;
+const DEG_PER_SECOND = 6;
+const UPDATE_INTERVAL_MS = 100;
 
-        let minute = times[0];
-        let second = times[1];
-        let millisecond = times[2];
-        let minuteAngle = minute * 30 + second / 2 + millisecond / 2000;
-        let secondAngle = 360 + second * 6 + (6 * millisecond/1000);
-        this.minuteRotateDeg = `rotateZ(${minuteAngle}deg)`;
-        this.secondRotateDeg = `rotateZ(${secondAngle}deg)`;
-      }
+export default {
+  data() {
+    return {
+      HOUR_LIST: [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+      secondRotateDeg: 'rotateZ(360deg)',
+      minuteRotateDeg: 'rotateZ(0deg)',
+    };
+  },
+  methods: {
+    startTimer() {
+      this.updateHands();
+      this._timer = setInterval(() => {
+        this.updateHands();
+      }, UPDATE_INTERVAL_MS);
     },
-    mounted() {
-      this.show();
-    }
+    updateHands() {
+      const now = new Date();
+      const minute = now.getMinutes();
+      const second = now.getSeconds();
+      const millisecond = now.getMilliseconds();
+
+      const minuteAngle = minute * DEG_PER_HOUR + second / 2 + millisecond / 2000;
+      const secondAngle = 360 + second * DEG_PER_SECOND + (DEG_PER_SECOND * millisecond / 1000);
+
+      this.minuteRotateDeg = `rotateZ(${minuteAngle}deg)`;
+      this.secondRotateDeg = `rotateZ(${secondAngle}deg)`;
+    },
+  },
+  mounted() {
+    this.startTimer();
+  },
+  beforeUnmount() {
+    clearInterval(this._timer);
+  },
 }
 </script>
 

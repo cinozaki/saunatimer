@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildSaunaRoom } from './sauna-room.js';
 import { buildFurniture } from './furniture.js';
+import { buildChillSpace } from './chill-space.js';
 import { ClockTexture } from './clock-texture.js';
 import { PomodoroPanel } from './pomodoro-panel.js';
 import { CameraController } from './camera-controller.js';
@@ -29,6 +30,7 @@ const camera = new THREE.PerspectiveCamera(
 // --- サウナ室 ---
 buildSaunaRoom(scene);
 buildFurniture(scene);
+buildChillSpace(scene);
 
 // --- 時計 ---
 const clock = new ClockTexture();
@@ -45,10 +47,16 @@ scene.add(clockMesh);
 
 // --- ポモドーロ（HTMLオーバーレイ、時計・カメラと連動） ---
 const pomodoroPanel = new PomodoroPanel({
-  onSessionStart: () => clock.startSession(),
+  onSessionStart: () => {
+    clock.startSession();
+    cameraCtrl.moveTo('front');
+  },
   onSessionPause: () => clock.pauseSession(),
   onSessionResume: () => clock.resumeSession(),
-  onSessionStop: () => clock.stopSession(),
+  onSessionStop: () => {
+    clock.stopSession();
+    cameraCtrl.moveTo('chill');
+  },
 });
 
 // ブラウザ通知の許可をリクエスト

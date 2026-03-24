@@ -1,50 +1,64 @@
 import * as THREE from 'three';
 
-const FRONT_VIEW = {
-  position: new THREE.Vector3(0, 1.6, 1.8),
-  lookAt: new THREE.Vector3(0, 1.6, 0),
-};
-
-const OVERVIEW = {
-  position: new THREE.Vector3(0, 5.5, 3.5),
-  lookAt: new THREE.Vector3(0, 1.0, 0),
+const VIEWS = {
+  front: {
+    position: new THREE.Vector3(0, 1.6, 1.8),
+    lookAt: new THREE.Vector3(0, 1.6, 0),
+  },
+  overview: {
+    position: new THREE.Vector3(0, 5.5, 3.5),
+    lookAt: new THREE.Vector3(0, 1.0, 0),
+  },
+  chill: {
+    position: new THREE.Vector3(-4.5, 1.4, 2.2),
+    lookAt: new THREE.Vector3(-5.5, 0.6, -0.3),
+  },
 };
 
 const TRANSITION_DURATION = 1.0; // 秒
 
 /**
- * 正面/俯瞰の2視点をクリックで切り替えるコントローラー
+ * カメラコントローラー
  */
 export class CameraController {
   constructor(camera) {
     this.camera = camera;
-    this.isFrontView = true;
+    this._currentView = 'front';
     this._transitioning = false;
     this._progress = 0;
     this._from = { position: new THREE.Vector3(), lookAt: new THREE.Vector3() };
     this._to = { position: new THREE.Vector3(), lookAt: new THREE.Vector3() };
-    this._currentLookAt = FRONT_VIEW.lookAt.clone();
+    this._currentLookAt = VIEWS.front.lookAt.clone();
 
-    // 初期位置
-    camera.position.copy(FRONT_VIEW.position);
-    camera.lookAt(FRONT_VIEW.lookAt);
+    camera.position.copy(VIEWS.front.position);
+    camera.lookAt(VIEWS.front.lookAt);
   }
 
+  /** サウナ室内の正面/俯瞰をトグル */
   toggle() {
     if (this._transitioning) return;
+    if (this._currentView === 'front') {
+      this.moveTo('overview');
+    } else {
+      this.moveTo('front');
+    }
+  }
+
+  /** 指定ビューへ遷移 */
+  moveTo(viewName) {
+    if (this._transitioning) return;
+    const target = VIEWS[viewName];
+    if (!target || this._currentView === viewName) return;
 
     this._transitioning = true;
     this._progress = 0;
 
-    const from = this.isFrontView ? FRONT_VIEW : OVERVIEW;
-    const to = this.isFrontView ? OVERVIEW : FRONT_VIEW;
+    this._from.position.copy(this.camera.position);
+    this._from.lookAt.copy(this._currentLookAt);
+    this._to.position.copy(target.position);
+    this._to.lookAt.copy(target.lookAt);
 
-    this._from.position.copy(from.position);
-    this._from.lookAt.copy(from.lookAt);
-    this._to.position.copy(to.position);
-    this._to.lookAt.copy(to.lookAt);
-
-    this.isFrontView = !this.isFrontView;
+    this._currentView = viewName;
   }
 
   /** 毎フレーム呼ぶ。deltaTime は秒単位 */

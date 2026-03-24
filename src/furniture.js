@@ -297,10 +297,106 @@ function buildBucket(scene) {
 }
 
 /**
+ * サウナ室左壁のウッドドア（丸窓付き）
+ */
+function buildDoor(scene) {
+  const WALL_X = -1.99; // 左壁の内側表面に重ねる
+  const DOOR_Z = 1.2;
+  const DOOR_W = 0.85;
+  const DOOR_H = 2.05;
+
+  const group = new THREE.Group();
+
+  // ドアパネル（木目テクスチャ）
+  const doorTexture = createWoodTexture({
+    width: 256,
+    height: 512,
+    baseColor: '#8a5a30',
+    grainColor: '#6a4020',
+    horizontal: false,
+  });
+  const doorMat = new THREE.MeshStandardMaterial({
+    map: doorTexture,
+    roughness: 0.8,
+    metalness: 0.0,
+  });
+  const doorGeo = new THREE.PlaneGeometry(DOOR_W, DOOR_H);
+  const door = new THREE.Mesh(doorGeo, doorMat);
+  door.rotation.y = Math.PI / 2;
+  door.position.set(WALL_X, DOOR_H / 2 + 0.02, DOOR_Z);
+  group.add(door);
+
+  // ドア枠
+  const frameMat = new THREE.MeshStandardMaterial({
+    color: 0x5a3518,
+    roughness: 0.7,
+    metalness: 0.0,
+  });
+  const frameThick = 0.06;
+  // 上枠
+  const topGeo = new THREE.BoxGeometry(frameThick, 0.06, DOOR_W + frameThick * 2);
+  const topFrame = new THREE.Mesh(topGeo, frameMat);
+  topFrame.position.set(WALL_X, DOOR_H + 0.05, DOOR_Z);
+  group.add(topFrame);
+  // 左枠
+  const sideGeo = new THREE.BoxGeometry(frameThick, DOOR_H + 0.06, 0.06);
+  const leftFrame = new THREE.Mesh(sideGeo, frameMat);
+  leftFrame.position.set(WALL_X, DOOR_H / 2 + 0.02, DOOR_Z - DOOR_W / 2 - 0.03);
+  group.add(leftFrame);
+  // 右枠
+  const rightFrame = new THREE.Mesh(sideGeo, frameMat);
+  rightFrame.position.set(WALL_X, DOOR_H / 2 + 0.02, DOOR_Z + DOOR_W / 2 + 0.03);
+  group.add(rightFrame);
+
+  // 丸窓（ドア上部）
+  const WINDOW_Y = 1.5;
+  const WINDOW_R = 0.15;
+  // 窓枠（トーラス）
+  const windowFrameGeo = new THREE.TorusGeometry(WINDOW_R, 0.015, 8, 24);
+  const windowFrameMat = new THREE.MeshStandardMaterial({
+    color: 0x888888,
+    roughness: 0.3,
+    metalness: 0.7,
+  });
+  const windowFrame = new THREE.Mesh(windowFrameGeo, windowFrameMat);
+  windowFrame.rotation.y = Math.PI / 2;
+  windowFrame.position.set(WALL_X - 0.01, WINDOW_Y, DOOR_Z);
+  group.add(windowFrame);
+
+  // 窓ガラス（半透明の円）
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0xaaccdd,
+    roughness: 0.05,
+    metalness: 0.2,
+    transparent: true,
+    opacity: 0.4,
+  });
+  const glassGeo = new THREE.CircleGeometry(WINDOW_R - 0.01, 24);
+  const glass = new THREE.Mesh(glassGeo, glassMat);
+  glass.rotation.y = Math.PI / 2;
+  glass.position.set(WALL_X - 0.015, WINDOW_Y, DOOR_Z);
+  group.add(glass);
+
+  // ドアノブ
+  const knobMat = new THREE.MeshStandardMaterial({
+    color: 0xaaaaaa,
+    roughness: 0.3,
+    metalness: 0.8,
+  });
+  const knobGeo = new THREE.SphereGeometry(0.025, 8, 8);
+  const knob = new THREE.Mesh(knobGeo, knobMat);
+  knob.position.set(WALL_X - 0.03, 1.0, DOOR_Z + 0.3);
+  group.add(knob);
+
+  scene.add(group);
+}
+
+/**
  * すべての調度品をシーンに追加
  */
 export function buildFurniture(scene) {
   buildBench(scene);
   buildStove(scene);
   buildBucket(scene);
+  buildDoor(scene);
 }

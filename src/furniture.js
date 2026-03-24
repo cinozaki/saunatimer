@@ -109,8 +109,8 @@ function buildStove(scene) {
   const group = new THREE.Group();
   group.position.set(-1.2, 0, -1.2);
 
-  const STOVE_RADIUS = 0.22;
-  const STOVE_HEIGHT = 1.0;
+  const STOVE_RADIUS = 0.28;
+  const STOVE_HEIGHT = 1.2;
   const BAR_COUNT = 12;
 
   const metalMat = new THREE.MeshStandardMaterial({
@@ -168,10 +168,10 @@ function buildStove(scene) {
   });
 
   // ランダムシード的に石を詰める
-  const stoneRows = 8;
+  const stoneRows = 12;
   for (let row = 0; row < stoneRows; row++) {
     const y = 0.12 + (row / stoneRows) * (STOVE_HEIGHT - 0.1);
-    const stonesInRow = row === stoneRows - 1 ? 4 : 6;
+    const stonesInRow = row >= stoneRows - 2 ? 6 : 10;
     const innerRadius = STOVE_RADIUS * 0.55;
 
     for (let si = 0; si < stonesInRow; si++) {
@@ -193,11 +193,13 @@ function buildStove(scene) {
 
   // 頂上に盛り上がった石
   const topStones = [
-    [0, 1.08, 0, 0.055],
-    [0.07, 1.05, 0.05, 0.04],
-    [-0.05, 1.06, 0.07, 0.045],
-    [0.04, 1.07, -0.06, 0.04],
-    [-0.07, 1.05, -0.04, 0.04],
+    [0, STOVE_HEIGHT + 0.08, 0, 0.065],
+    [0.09, STOVE_HEIGHT + 0.05, 0.06, 0.05],
+    [-0.06, STOVE_HEIGHT + 0.06, 0.09, 0.055],
+    [0.05, STOVE_HEIGHT + 0.07, -0.08, 0.05],
+    [-0.09, STOVE_HEIGHT + 0.05, -0.05, 0.05],
+    [0.03, STOVE_HEIGHT + 0.04, 0.1, 0.045],
+    [-0.1, STOVE_HEIGHT + 0.06, 0.03, 0.05],
   ];
   topStones.forEach(([sx, sy, sz, sr]) => {
     const geo = new THREE.DodecahedronGeometry(sr, 0);
@@ -207,12 +209,12 @@ function buildStove(scene) {
   });
 
   // --- ストーブからの暖かい光 ---
-  const stoveLight = new THREE.PointLight(0xff4400, 0.8, 3.5);
-  stoveLight.position.set(0, 0.5, 0);
+  const stoveLight = new THREE.PointLight(0xff4400, 1.2, 4.5);
+  stoveLight.position.set(0, 0.6, 0);
   group.add(stoveLight);
 
-  const topGlow = new THREE.PointLight(0xff6622, 0.4, 2);
-  topGlow.position.set(0, 1.1, 0);
+  const topGlow = new THREE.PointLight(0xff6622, 0.6, 3);
+  topGlow.position.set(0, STOVE_HEIGHT + 0.1, 0);
   group.add(topGlow);
 
   scene.add(group);
@@ -228,7 +230,7 @@ function buildStoveGuard(scene, stovePos) {
   const group = new THREE.Group();
   group.position.copy(stovePos);
 
-  const GUARD_RADIUS = 0.55;
+  const GUARD_RADIUS = 0.65;
   const RAIL_COUNT = 3;
   const RAIL_SPACING = 0.12;
   const TOP_RAIL_Y = 0.6;
@@ -509,10 +511,10 @@ export function triggerLoyly() {
 }
 
 function _emitParticle(p) {
-  const spread = 0.15;
+  const spread = 0.2;
   p.mesh.position.set(
     STOVE_POS.x + (Math.random() - 0.5) * spread,
-    1.0 + Math.random() * 0.1,
+    1.2 + Math.random() * 0.1,
     STOVE_POS.z + (Math.random() - 0.5) * spread,
   );
   p.vx = (Math.random() - 0.5) * 0.04;

@@ -21,25 +21,147 @@ export class ClockTexture {
     this.texture = new THREE.CanvasTexture(this.canvas);
     this.texture.colorSpace = THREE.SRGBColorSpace;
 
+    // セッションモード
+    this._sessionMode = false;
+    this._sessionElapsedMs = 0;
+    this._sessionRunning = false;
+    this._lastTimestamp = null;
+
+    // スイープアニメーション
+    this._sweeping = false;
+    this._sweepStartTime = 0;
+    this._sweepFromMinute = 0;
+    this._sweepFromSecond = 0;
+    this._currentMinuteAngle = 0;
+    this._currentSecondAngle = 0;
+
     this._draw();
+  }
+
+  /** セッション開始: スイープしてから 0:00 で計測開始 */
+  startSession() {
+    this._startSweep('session');
+  }
+
+  /** セッション一時停止 */
+  pauseSession() {
+    this._sessionRunning = false;
+    this._lastTimestamp = null;
+  }
+
+  /** セッション再開 */
+  resumeSession() {
+    this._sessionRunning = true;
+    this._lastTimestamp = performance.now();
+  }
+
+  /** セッション終了: スイープして通常時計に戻る */
+  stopSession() {
+    this._startSweep('clock');
+  }
+
+  /**
+   * スイープアニメーションを開始
+   * @param {'session'|'clock'} target - スイープ後のモード
+   */
+  _startSweep(target) {
+    this._sweepFromMinute = this._currentMinuteAngle;
+    this._sweepFromSecond = this._currentSecondAngle;
+    this._sweepTarget = target;
+    this._sweeping = true;
+    this._sweepStartTime = performance.now();
+
+    // スイープ中は針の自走を止める
+    this._sessionRunning = false;
+    this._lastTimestamp = null;
+
+    if (target === 'session') {
+      this._sessionMode = true;
+      this._sessionElapsedMs = 0;
+    }
   }
 
   /** 毎フレーム呼んでテクスチャを更新 */
   update() {
+    if (this._sessionRunning) {
+      const now = performance.now();
+      if (this._lastTimestamp !== null) {
+        this._sessionElapsedMs += now - this._lastTimestamp;
+      }
+      this._lastTimestamp = now;
+    }
     this._draw();
     this.texture.needsUpdate = true;
   }
 
   _draw() {
     const ctx = this.ctx;
-    const now = new Date();
-    const minute = now.getMinutes();
-    const second = now.getSeconds();
-    const ms = now.getMilliseconds();
+    const SWEEP_DURATION = 800; // ms
 
-    const minute12 = minute % 12;
-    const minuteAngle = (minute12 * DEG_PER_HOUR + second / 2 + ms / 2000) * (Math.PI / 180);
-    const secondAngle = (second * DEG_PER_SECOND + DEG_PER_SECOND * ms / 1000) * (Math.PI / 180);
+    let minuteAngle, secondAngle;
+
+    if (this._sweeping) {
+      const elapsed = performance.now() - this._sweepStartTime;
+      const rawT = Math.min(elapsed / SWEEP_DURATION, 1);
+      // ease out with slight overshoot (like a gauge needle)
+      const t = rawT < 1
+        ? 1 - Math.pow(1 - rawT, 3) + Math.sin(rawT * Math.PI) * 0.08
+        : 1;
+
+      // スイープ先の角度を計算（到着時刻 = 現在 + 残りのスイープ時間）
+      let toMin = 0, toSec = 0;
+      if (this._sweepTarget === 'clock') {
+        const arrivalTime = new Date(Date.now() + SWEEP_DURATION - elapsed);
+        const arrMin = arrivalTime.getMinutes() % 12;
+        const arrSec = arrivalTime.getSeconds();
+        const arrMs = arrivalTime.getMilliseconds();
+        toMin = (arrMin * DEG_PER_HOUR + arrSec / 2 + arrMs / 2000) * (Math.PI / 180);
+        toSec = (arrSec * DEG_PER_SECOND + DEG_PER_SECOND * arrMs / 1000) * (Math.PI / 180);
+      }
+
+      // 最短経路で補間
+      let fromMin = this._sweepFromMinute % (Math.PI * 2);
+      let fromSec = this._sweepFromSecond % (Math.PI * 2);
+      let diffMin = toMin - fromMin;
+      let diffSec = toSec - fromSec;
+      // 最短方向に正規化
+      if (diffMin > Math.PI) diffMin -= Math.PI * 2;
+      if (diffMin < -Math.PI) diffMin += Math.PI * 2;
+      if (diffSec > Math.PI) diffSec -= Math.PI * 2;
+      if (diffSec < -Math.PI) diffSec += Math.PI * 2;
+
+      minuteAngle = fromMin + diffMin * t;
+      secondAngle = fromSec + diffSec * t;
+
+      if (rawT >= 1) {
+        this._sweeping = false;
+        if (this._sweepTarget === 'session') {
+          this._sessionRunning = true;
+          this._lastTimestamp = performance.now();
+          minuteAngle = 0;
+          secondAngle = 0;
+        } else {
+          this._sessionMode = false;
+        }
+      }
+    } else if (this._sessionMode) {
+      const totalSeconds = this._sessionElapsedMs / 1000;
+      const minute = Math.floor(totalSeconds / 60) % 12;
+      const second = totalSeconds % 60;
+      minuteAngle = (minute * DEG_PER_HOUR + second / 2) * (Math.PI / 180);
+      secondAngle = (second * DEG_PER_SECOND) * (Math.PI / 180);
+    } else {
+      const now = new Date();
+      const minute = now.getMinutes() % 12;
+      const second = now.getSeconds();
+      const ms = now.getMilliseconds();
+      minuteAngle = (minute * DEG_PER_HOUR + second / 2 + ms / 2000) * (Math.PI / 180);
+      secondAngle = (second * DEG_PER_SECOND + DEG_PER_SECOND * ms / 1000) * (Math.PI / 180);
+    }
+
+    // 現在角度を記録（次のスイープ開始用）
+    this._currentMinuteAngle = minuteAngle;
+    this._currentSecondAngle = secondAngle;
 
     ctx.clearRect(0, 0, CLOCK_SIZE, CLOCK_SIZE);
 

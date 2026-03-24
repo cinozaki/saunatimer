@@ -16,7 +16,7 @@ const TRANSITION_DURATION = 1.0; // 秒
  * 正面/俯瞰の2視点をクリックで切り替えるコントローラー
  */
 export class CameraController {
-  constructor(camera, domElement) {
+  constructor(camera) {
     this.camera = camera;
     this.isFrontView = true;
     this._transitioning = false;
@@ -28,13 +28,6 @@ export class CameraController {
     // 初期位置
     camera.position.copy(FRONT_VIEW.position);
     camera.lookAt(FRONT_VIEW.lookAt);
-
-    // クリック/タップで切替
-    domElement.addEventListener('click', () => this.toggle());
-    domElement.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      this.toggle();
-    });
   }
 
   toggle() {

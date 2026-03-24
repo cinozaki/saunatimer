@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildSaunaRoom } from './sauna-room.js';
 import { buildFurniture } from './furniture.js';
 import { ClockTexture } from './clock-texture.js';
+import { PomodoroPanel } from './pomodoro-panel.js';
 import { CameraController } from './camera-controller.js';
 
 // --- Renderer ---
@@ -42,8 +43,28 @@ const clockMesh = new THREE.Mesh(clockGeometry, clockMaterial);
 clockMesh.position.set(0, 1.8, -1.98);
 scene.add(clockMesh);
 
+// --- ポモドーロ（HTMLオーバーレイ、時計・カメラと連動） ---
+const pomodoroPanel = new PomodoroPanel({
+  onSessionStart: () => clock.startSession(),
+  onSessionPause: () => clock.pauseSession(),
+  onSessionResume: () => clock.resumeSession(),
+  onSessionStop: () => clock.stopSession(),
+});
+
+// ブラウザ通知の許可をリクエスト
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+
 // --- カメラコントローラー ---
-const cameraCtrl = new CameraController(camera, renderer.domElement);
+const cameraCtrl = new CameraController(camera);
+
+// クリック/タップでカメラ切替
+renderer.domElement.addEventListener('click', () => cameraCtrl.toggle());
+renderer.domElement.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  cameraCtrl.toggle();
+});
 
 // --- Resize ---
 function onResize() {
@@ -63,6 +84,7 @@ function animate() {
   const delta = threeClock.getDelta();
   cameraCtrl.update(delta);
   clock.update();
+  pomodoroPanel.update();
   renderer.render(scene, camera);
 }
 animate();

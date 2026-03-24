@@ -261,6 +261,7 @@ function buildBucket(scene) {
   const outer = new THREE.Mesh(outerGeo, woodMat);
   outer.position.y = 0.1;
   outer.castShadow = true;
+  outer.name = 'loyly-bucket';
   group.add(outer);
 
   // タガ（金属バンド）
@@ -377,16 +378,35 @@ function buildDoor(scene) {
   glass.position.set(WALL_X - 0.015, WINDOW_Y, DOOR_Z);
   group.add(glass);
 
-  // ドアノブ
-  const knobMat = new THREE.MeshStandardMaterial({
+  // 四角い取手（コの字型ハンドル、両面）
+  const handleMat = new THREE.MeshStandardMaterial({
     color: 0xaaaaaa,
     roughness: 0.3,
     metalness: 0.8,
   });
-  const knobGeo = new THREE.SphereGeometry(0.025, 8, 8);
-  const knob = new THREE.Mesh(knobGeo, knobMat);
-  knob.position.set(WALL_X - 0.03, 1.0, DOOR_Z + 0.3);
-  group.add(knob);
+  const HANDLE_W = 0.02;   // 断面の太さ
+  const HANDLE_H = 0.12;   // 握り部分の長さ（縦）
+  const HANDLE_D = 0.04;   // 壁からの出っ張り
+  const HANDLE_Z = DOOR_Z - 0.3;
+  const HANDLE_Y = 1.0;
+
+  const gripGeo = new THREE.BoxGeometry(HANDLE_D, HANDLE_H, HANDLE_W);
+  const bracketGeo = new THREE.BoxGeometry(HANDLE_D, HANDLE_W, HANDLE_W);
+
+  // 外側（チルスペース側）・内側（サウナ室側）両方に取手
+  [-(0.02 + HANDLE_D / 2), (0.02 + HANDLE_D / 2)].forEach((dx) => {
+    const grip = new THREE.Mesh(gripGeo, handleMat);
+    grip.position.set(WALL_X + dx, HANDLE_Y, HANDLE_Z);
+    group.add(grip);
+
+    const topBracket = new THREE.Mesh(bracketGeo, handleMat);
+    topBracket.position.set(WALL_X + dx, HANDLE_Y + HANDLE_H / 2 - HANDLE_W / 2, HANDLE_Z);
+    group.add(topBracket);
+
+    const bottomBracket = new THREE.Mesh(bracketGeo, handleMat);
+    bottomBracket.position.set(WALL_X + dx, HANDLE_Y - HANDLE_H / 2 + HANDLE_W / 2, HANDLE_Z);
+    group.add(bottomBracket);
+  });
 
   scene.add(group);
 }
@@ -399,4 +419,120 @@ export function buildFurniture(scene) {
   buildStove(scene);
   buildBucket(scene);
   buildDoor(scene);
+}
+
+/**
+ * ロウリュ蒸気エフェクト
+ * ストーブ上部から蒸気パーティクルが立ち上る
+ */
+const STOVE_POS = { x: -1.2, z: -1.2 };
+const STEAM_COUNT = 60;
+
+let _steamParticles = null;
+let _steamActive = false;
+let _steamTimer = 0;
+
+export function createSteamEffect(scene) {
+  const particles = [];
+  const steamMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+  });
+
+  for (let i = 0; i < STEAM_COUNT; i++) {
+    const size = 0.04 + Math.random() * 0.06;
+    const geo = new THREE.PlaneGeometry(size, size);
+    const mat = steamMat.clone();
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.visible = false;
+    scene.add(mesh);
+    particles.push({
+      mesh,
+      mat,
+      // 各パーティクルの初期パラメータ（emit 時にセット）
+      vx: 0, vy: 0, vz: 0,
+      life: 0, maxLife: 0, size,
+    });
+  }
+
+  _steamParticles = particles;
+}
+
+/** ロウリュを発動する */
+export function triggerLoyly() {
+  if (_steamActive) return; // 連打防止
+  _steamActive = true;
+  _steamTimer = 0;
+
+  // 全パーティクルをストーブ上部にランダム配置して放出
+  for (const p of _steamParticles) {
+    _emitParticle(p);
+  }
+}
+
+function _emitParticle(p) {
+  const spread = 0.15;
+  p.mesh.position.set(
+    STOVE_POS.x + (Math.random() - 0.5) * spread,
+    1.0 + Math.random() * 0.1,
+    STOVE_POS.z + (Math.random() - 0.5) * spread,
+  );
+  p.vx = (Math.random() - 0.5) * 0.04;
+  p.vy = 0.25 + Math.random() * 0.2;
+  p.vz = (Math.random() - 0.5) * 0.04;
+  p.life = 0;
+  p.maxLife = 5 + Math.random() * 6;
+  p.mesh.visible = true;
+  p.mesh.scale.setScalar(0.5);
+  p.mat.opacity = 0;
+}
+
+/** 毎フレーム呼び出し */
+export function updateSteamEffect(delta, camera) {
+  if (!_steamParticles || !_steamActive) return;
+
+  _steamTimer += delta;
+  let allDone = true;
+
+  for (const p of _steamParticles) {
+    if (!p.mesh.visible) continue;
+
+    p.life += delta;
+    if (p.life >= p.maxLife) {
+      p.mesh.visible = false;
+      p.mat.opacity = 0;
+      continue;
+    }
+
+    allDone = false;
+    const t = p.life / p.maxLife; // 0→1
+
+    // 上昇 + 横に揺れる
+    p.mesh.position.x += p.vx * delta + Math.sin(p.life * 3 + p.vx * 10) * 0.002;
+    p.mesh.position.y += p.vy * delta;
+    p.mesh.position.z += p.vz * delta + Math.cos(p.life * 2.5 + p.vz * 10) * 0.002;
+
+    // 上昇速度を徐々に減速
+    p.vy *= 0.995;
+
+    // スケール: 小→大
+    const scale = 0.5 + t * 2.5;
+    p.mesh.scale.setScalar(scale);
+
+    // 透明度: ふわっと出て消える
+    if (t < 0.15) {
+      p.mat.opacity = (t / 0.15) * 0.35;
+    } else {
+      p.mat.opacity = 0.35 * (1 - (t - 0.15) / 0.85);
+    }
+
+    // ビルボード（常にカメラに向く）
+    p.mesh.quaternion.copy(camera.quaternion);
+  }
+
+  if (allDone) {
+    _steamActive = false;
+  }
 }

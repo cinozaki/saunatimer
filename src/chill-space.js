@@ -6,6 +6,19 @@ const SPACE_DEPTH = 4;
 const SPACE_HEIGHT = 3;
 const ORIGIN_X = -2 - SPACE_WIDTH / 2; // = -5
 
+// 水面アニメーション用
+let _waterSurface = null;
+let _waterBaseY = 0;
+let _spoutLocalX = 0;
+let _spoutLocalZ = 0;
+let _waterWidth = 0;
+let _waterDepth = 0;
+// 注水アニメーション用
+let _streamMesh = null;
+let _streamCanvas = null;
+let _streamCtx = null;
+let _streamTexture = null;
+
 /**
  * チルスペース（水風呂 + 外気浴）を構築する
  * 草加健康センター風: 石畳の床、半屋外、水風呂、アディロンダックチェア
@@ -173,9 +186,8 @@ function _buildColdBath(group) {
   bottom.position.set(BX, 0.02, BZ);
   group.add(bottom);
 
-  // 水（側面も見えるよう BoxGeometry で水を張る）
+  // 水（水面 + 側面）
   const waterH = BH - 0.08;
-  const waterGeo = new THREE.BoxGeometry(BW - 0.02, waterH, BD - 0.02);
   const waterMat = new THREE.MeshStandardMaterial({
     color: 0x2a6677,
     roughness: 0.02,
@@ -183,9 +195,46 @@ function _buildColdBath(group) {
     transparent: true,
     opacity: 0.55,
   });
-  const water = new THREE.Mesh(waterGeo, waterMat);
-  water.position.set(BX, waterH / 2 + 0.01, BZ);
-  group.add(water);
+
+  // 水面（細分化した PlaneGeometry で波を表現）
+  const segX = 32;
+  const segZ = 24;
+  const surfaceGeo = new THREE.PlaneGeometry(BW - 0.02, BD - 0.02, segX, segZ);
+  const surface = new THREE.Mesh(surfaceGeo, waterMat);
+  surface.rotation.x = -Math.PI / 2;
+  const surfaceY = waterH + 0.01;
+  surface.position.set(BX, surfaceY, BZ);
+  group.add(surface);
+
+  // 側面（前後左右の薄い板）
+  const sideW = BW - 0.02;
+  const sideD = BD - 0.02;
+  const sideMat = waterMat;
+  // 前面・背面
+  [[-sideD / 2, 0], [sideD / 2, Math.PI]].forEach(([dz, ry]) => {
+    const geo = new THREE.PlaneGeometry(sideW, waterH);
+    const side = new THREE.Mesh(geo, sideMat);
+    side.position.set(BX, waterH / 2 + 0.01, BZ + dz);
+    side.rotation.y = ry;
+    group.add(side);
+  });
+  // 左面・右面
+  [[-sideW / 2, Math.PI / 2], [sideW / 2, -Math.PI / 2]].forEach(([dx, ry]) => {
+    const geo = new THREE.PlaneGeometry(sideD, waterH);
+    const side = new THREE.Mesh(geo, sideMat);
+    side.position.set(BX + dx, waterH / 2 + 0.01, BZ);
+    side.rotation.y = ry;
+    group.add(side);
+  });
+
+  // 水面アニメーション用の変数を保存
+  _waterSurface = surface;
+  _waterBaseY = surfaceY;
+  _waterWidth = BW - 0.02;
+  _waterDepth = BD - 0.02;
+  // 注水口の水面ローカル座標（水面中心からの相対位置）
+  _spoutLocalX = 0.6;  // BX + 0.6 - BX
+  _spoutLocalZ = -BD / 2 + 0.15 - 0;  // 注水口の落下点（奥壁側）
 
   // --- 水中ライト（ナイトプール風、白っぽい光） ---
   // 底面に沿って3箇所
@@ -256,19 +305,83 @@ function _buildColdBath(group) {
   plate.position.set(BX + 0.6, BH + 0.2, BZ - BD / 2 + 0.01);
   group.add(plate);
 
-  // 水流（幅広の薄い板状）
-  const streamH = BH + 0.15;
-  const streamGeo = new THREE.BoxGeometry(spoutW - 0.04, streamH, 0.01);
-  const streamMat = new THREE.MeshStandardMaterial({
-    color: 0x88ccdd,
-    roughness: 0.0,
-    metalness: 0.1,
-    transparent: true,
-    opacity: 0.3,
-  });
-  const stream = new THREE.Mesh(streamGeo, streamMat);
-  stream.position.set(BX + 0.6, BH + 0.18 - streamH / 2, BZ - BD / 2 + spoutD);
-  group.add(stream);
+  // 水流（放物線カーブの半筒形 + Canvas テクスチャで流れを表現）
+  {
+    const streamW = spoutW - 0.04;
+    const spoutTipY = BH + 0.18;           // 吐水口先端の高さ
+    const spoutTipZ = BZ - BD / 2 + spoutD; // 吐水口先端のZ
+    const waterSurfaceY = BH - 0.04;       // 着水点の高さ
+    const fallH = spoutTipY - waterSurfaceY;
+    const curveForward = 0.12;              // 前方への膨らみ
+    const thickness = 0.03;                 // 水流の厚み（奥行き方向）
+
+    // 半筒形の断面（手前に膨らむ弧）× 放物線カーブ
+    const segY = 12;  // 落下方向の分割数
+    const segX = 6;   // 断面方向の分割数（弧を描く）
+    const geo = new THREE.BufferGeometry();
+    const vertices = [];
+    const uvs = [];
+    const indices = [];
+
+    for (let iy = 0; iy <= segY; iy++) {
+      const t = iy / segY; // 0（上）〜 1（下）
+      const y = spoutTipY - t * fallH;
+      const zCenter = spoutTipZ + curveForward * Math.sin(t * Math.PI) * (1 - t * 0.3);
+      // 下に行くほど水流が少し細くなる
+      const widthScale = 1.0 - t * 0.15;
+      const thickScale = 1.0 - t * 0.2;
+
+      for (let ix = 0; ix <= segX; ix++) {
+        const u = ix / segX; // 0〜1（断面の左端〜右端）
+        // 断面: X方向に幅、Z方向に弧（手前に膨らむ半筒）
+        const angle = u * Math.PI; // 0〜π（半円）
+        const x = BX + 0.6 + (u - 0.5) * streamW * widthScale;
+        const z = zCenter + Math.sin(angle) * thickness * thickScale;
+        vertices.push(x, y, z);
+        // UV: u=断面位置、v=0が吐水口(上)、v=1が着水点(下)
+        // Three.js テクスチャは v=0→画像下端、v=1→画像上端なので反転
+        uvs.push(u, 1 - t);
+      }
+    }
+
+    for (let iy = 0; iy < segY; iy++) {
+      for (let ix = 0; ix < segX; ix++) {
+        const a = iy * (segX + 1) + ix;
+        const b = a + 1;
+        const c = a + (segX + 1);
+        const d = c + 1;
+        indices.push(a, c, b, b, c, d);
+      }
+    }
+
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+
+    // Canvas テクスチャ（縦スクロールで流れを表現）
+    _streamCanvas = document.createElement('canvas');
+    _streamCanvas.width = 64;
+    _streamCanvas.height = 128;
+    _streamCtx = _streamCanvas.getContext('2d');
+    _streamTexture = new THREE.CanvasTexture(_streamCanvas);
+    _streamTexture.wrapS = THREE.RepeatWrapping;
+    _streamTexture.wrapT = THREE.RepeatWrapping;
+
+    const mat = new THREE.MeshStandardMaterial({
+      map: _streamTexture,
+      color: 0x99ddee,
+      roughness: 0.0,
+      metalness: 0.15,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+
+    _streamMesh = new THREE.Mesh(geo, mat);
+    group.add(_streamMesh);
+  }
 
   // --- 桶（プラスチック製、白） ---
   const bucketGroup = new THREE.Group();
@@ -312,6 +425,87 @@ function _buildAdirondackChairs(group) {
     chair.rotation.y = rot;
     group.add(chair);
   });
+}
+
+/**
+ * 水面の波紋アニメーション + 注水流アニメーションを更新する（毎フレーム呼び出し）
+ */
+export function updateChillSpace(time) {
+  if (!_waterSurface) return;
+
+  // --- 水面の波紋 ---
+  const pos = _waterSurface.geometry.attributes.position;
+  const amplitude = 0.012;   // 波の高さ（強め）
+  const rippleSpeed = 4.0;   // 波の伝播速度
+  const frequency = 10.0;    // 波の細かさ
+  const decay = 1.8;         // 距離減衰（緩めで遠くまで届く）
+
+  for (let i = 0; i < pos.count; i++) {
+    const vx = pos.getX(i);
+    const vy = pos.getY(i);
+
+    // 注水口からの距離
+    const dx = vx - _spoutLocalX;
+    const dz = vy - _spoutLocalZ;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+
+    // 注水口から広がる同心円波紋（複数の波を重ねてリアルに）
+    const ripple1 = Math.sin(dist * frequency - time * rippleSpeed)
+                  * amplitude * Math.exp(-dist * decay);
+    const ripple2 = Math.sin(dist * frequency * 1.7 - time * rippleSpeed * 1.3 + 1.0)
+                  * amplitude * 0.4 * Math.exp(-dist * decay * 1.2);
+
+    // ゆったりとした全体のうねり
+    const swell = Math.sin(vx * 3.0 + time * 0.8) * Math.cos(vy * 2.5 + time * 0.6)
+                * 0.005;
+
+    // 微細なさざ波（全体）
+    const micro = Math.sin(vx * 22 + time * 3.0) * Math.cos(vy * 18 + time * 2.2)
+                * 0.003;
+
+    pos.setZ(i, ripple1 + ripple2 + swell + micro);
+  }
+
+  pos.needsUpdate = true;
+  _waterSurface.geometry.computeVertexNormals();
+
+  // --- 注水流アニメーション（Canvas テクスチャを縦スクロール） ---
+  if (_streamCtx && _streamTexture) {
+    const ctx = _streamCtx;
+    const cw = _streamCanvas.width;
+    const ch = _streamCanvas.height;
+
+    ctx.clearRect(0, 0, cw, ch);
+
+    // 縦方向にスクロールする流水模様を描画
+    const scrollOffset = (time * 120) % ch;
+    for (let y = -ch; y < ch * 2; y += 3) {
+      const yy = (y + scrollOffset) % (ch * 2) - ch;
+      // 幅の揺れ（自然な水の乱流）
+      const waveX = Math.sin(y * 0.08 + time * 4) * 6
+                  + Math.sin(y * 0.15 + time * 6) * 3;
+      const alpha = 0.15 + Math.sin(y * 0.12 + time * 5) * 0.1
+                         + Math.sin(y * 0.25 + time * 8) * 0.05;
+      ctx.globalAlpha = Math.max(0.05, Math.min(0.35, alpha));
+      ctx.fillStyle = '#cceeFF';
+      ctx.fillRect(8 + waveX, yy, cw - 16 - waveX * 2, 2);
+    }
+
+    // ハイライト（光の筋）
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 3; i++) {
+      const lx = cw * 0.3 + Math.sin(time * 3 + i * 2) * 8;
+      const ly = ((time * 100 + i * 40) % ch);
+      ctx.fillRect(lx, ly, 2, 12);
+    }
+
+    ctx.globalAlpha = 1;
+    _streamTexture.needsUpdate = true;
+
+    // 透明度の微妙な揺れ
+    _streamMesh.material.opacity = 0.32 + Math.sin(time * 2.5) * 0.05;
+  }
 }
 
 function _createAdirondackChair() {

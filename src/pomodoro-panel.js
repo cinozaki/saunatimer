@@ -187,6 +187,18 @@ export class PomodoroPanel {
       btnMain: container.querySelector('.pomo-btn-main'),
       btnSkip: container.querySelector('.pomo-btn-skip'),
     };
+
+    // ファビコン用 Canvas
+    this._faviconCanvas = document.createElement('canvas');
+    this._faviconCanvas.width = 64;
+    this._faviconCanvas.height = 64;
+    this._faviconLink = document.querySelector('link[rel="icon"]');
+    if (!this._faviconLink) {
+      this._faviconLink = document.createElement('link');
+      this._faviconLink.rel = 'icon';
+      document.head.appendChild(this._faviconLink);
+    }
+    this._defaultTitle = document.title;
   }
 
   _render() {
@@ -229,6 +241,67 @@ export class PomodoroPanel {
     // スキップボタン（進行中かつ一時停止中に表示）
     const showSkip = !isIdle;
     el.btnSkip.className = 'pomo-btn pomo-btn-skip' + (showSkip ? ' visible' : '');
+
+    // タイトル更新
+    if (isIdle) {
+      document.title = this._defaultTitle;
+    } else {
+      const label = isBreak ? (pomo.state === STATE.LONG_BREAK ? 'LONG BREAK' : 'BREAK') : 'HEATING';
+      document.title = `${pomo.displayTime} - ${label}`;
+    }
+
+    // ファビコン更新
+    this._updateFavicon(pomo);
+  }
+
+  _updateFavicon(pomo) {
+    const canvas = this._faviconCanvas;
+    const ctx = canvas.getContext('2d');
+    const size = 64;
+    const isIdle = pomo.state === STATE.IDLE;
+    const isBreak = pomo.isBreak;
+
+    ctx.clearRect(0, 0, size, size);
+
+    if (isIdle) {
+      // IDLE: グレーの円
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, 28, 0, Math.PI * 2);
+      ctx.fillStyle = '#666';
+      ctx.fill();
+    } else {
+      // 進行中: 進捗を示す円弧
+      const color = isBreak ? '#66ddaa' : '#ff6633';
+      const bgColor = isBreak ? '#1a4433' : '#4a1a0a';
+
+      // 背景円
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, 28, 0, Math.PI * 2);
+      ctx.fillStyle = bgColor;
+      ctx.fill();
+
+      // 進捗アーク（残り時間を表示、上から時計回り）
+      const remaining = 1 - pomo.progress;
+      if (remaining > 0) {
+        ctx.beginPath();
+        ctx.moveTo(size / 2, size / 2);
+        ctx.arc(size / 2, size / 2, 28,
+          -Math.PI / 2,
+          -Math.PI / 2 + remaining * Math.PI * 2);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+
+      // 一時停止中は中央にポーズマーク
+      if (!pomo.running) {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(22, 20, 7, 24);
+        ctx.fillRect(35, 20, 7, 24);
+      }
+    }
+
+    this._faviconLink.href = canvas.toDataURL('image/png');
   }
 
   _onPhaseComplete(prevState, nextState) {

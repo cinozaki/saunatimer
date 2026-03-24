@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { buildSaunaRoom } from './sauna-room.js';
-import { buildFurniture } from './furniture.js';
-import { buildChillSpace } from './chill-space.js';
+import { buildFurniture, createSteamEffect, triggerLoyly, updateSteamEffect } from './furniture.js';
+import { buildChillSpace, updateChillSpace } from './chill-space.js';
 import { ClockTexture } from './clock-texture.js';
 import { PomodoroPanel } from './pomodoro-panel.js';
 import { CameraController } from './camera-controller.js';
@@ -31,6 +31,7 @@ const camera = new THREE.PerspectiveCamera(
 buildSaunaRoom(scene);
 buildFurniture(scene);
 buildChillSpace(scene);
+createSteamEffect(scene);
 
 // --- 時計 ---
 const clock = new ClockTexture();
@@ -67,11 +68,30 @@ if ('Notification' in window && Notification.permission === 'default') {
 // --- カメラコントローラー ---
 const cameraCtrl = new CameraController(camera);
 
-// クリック/タップでカメラ切替
-renderer.domElement.addEventListener('click', () => cameraCtrl.toggle());
+// --- Raycaster（桶クリック検知） ---
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function onPointerClick(clientX, clientY) {
+  pointer.x = (clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+
+  const hits = raycaster.intersectObjects(scene.children, true);
+  for (const hit of hits) {
+    if (hit.object.name === 'loyly-bucket') {
+      triggerLoyly();
+      return; // 桶をクリックした場合はカメラ切替しない
+    }
+  }
+  cameraCtrl.toggle();
+}
+
+renderer.domElement.addEventListener('click', (e) => onPointerClick(e.clientX, e.clientY));
 renderer.domElement.addEventListener('touchend', (e) => {
   e.preventDefault();
-  cameraCtrl.toggle();
+  const t = e.changedTouches[0];
+  onPointerClick(t.clientX, t.clientY);
 });
 
 // --- Resize ---
@@ -90,9 +110,12 @@ const threeClock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const delta = threeClock.getDelta();
+  const elapsed = threeClock.getElapsedTime();
   cameraCtrl.update(delta);
   clock.update();
   pomodoroPanel.update();
+  updateChillSpace(elapsed);
+  updateSteamEffect(delta, camera);
   renderer.render(scene, camera);
 }
 animate();

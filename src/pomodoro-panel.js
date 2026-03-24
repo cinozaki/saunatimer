@@ -296,11 +296,18 @@ export class PomodoroPanel {
       this._onSessionStop();
     });
 
-    // パネル折りたたみ
+    // パネル折りたたみ（状態を localStorage に保存）
     const collapseBtn = container.querySelector('.pomo-collapse-btn');
+    const COLLAPSE_KEY = 'saunatimer-panel-collapsed';
+    const initCollapsed = localStorage.getItem(COLLAPSE_KEY) === '1';
+    if (initCollapsed) {
+      container.classList.add('collapsed');
+      collapseBtn.innerHTML = '<span class="material-symbols-rounded">expand_more</span>';
+    }
     collapseBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const collapsed = container.classList.toggle('collapsed');
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
       collapseBtn.innerHTML = collapsed
         ? '<span class="material-symbols-rounded">expand_more</span>'
         : '<span class="material-symbols-rounded">expand_less</span>';

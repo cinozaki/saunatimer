@@ -296,112 +296,90 @@ function _buildColdBath(group) {
 }
 
 /**
- * サンラウンジャー（白、1脚）
- * プールサイドの寝椅子、外気浴に最適
+ * アディロンダックチェア（白）
+ * 幅広アームレスト、扇状の背もたれが特徴
  */
 function _buildAdirondackChairs(group) {
-  const lounger = _createSunLounger();
-  lounger.position.set(ORIGIN_X - 1.2, 0, 0.8);
-  lounger.rotation.y = 0.4;
-  group.add(lounger);
+  const positions = [
+    { x: ORIGIN_X - 1.2, z: 0.8, rot: 0.4 },
+    { x: ORIGIN_X - 0.0, z: 1.4, rot: 0.05 },
+    { x: ORIGIN_X + 1.2, z: 1.0, rot: -0.3 },
+  ];
+
+  positions.forEach(({ x, z, rot }) => {
+    const chair = _createAdirondackChair();
+    chair.position.set(x, 0, z);
+    chair.rotation.y = rot;
+    group.add(chair);
+  });
 }
 
-function _createSunLounger() {
-  const lounger = new THREE.Group();
+function _createAdirondackChair() {
+  const chair = new THREE.Group();
 
-  const frameMat = new THREE.MeshStandardMaterial({
-    color: 0xeeeeee,
-    roughness: 0.3,
-    metalness: 0.1,
+  const woodMat = new THREE.MeshStandardMaterial({
+    color: 0xf0ede8,
+    roughness: 0.75,
+    metalness: 0.0,
   });
 
-  const BED_W = 0.55;
-  const BED_L = 1.4;
-  const BED_H = 0.3;
-  const SLAT_T = 0.02;
-  const BACK_L = 0.45;
-  const BACK_ANGLE = 0.6; // 背もたれの角度
+  const SEAT_W = 0.55;
+  const SEAT_D = 0.5;
+  const SEAT_H = 0.32;
+  const BACK_H = 0.55;
+  const BACK_ANGLE = -0.35; // 傾斜
+  const SLAT_T = 0.02; // 板の厚さ
+  const SLAT_GAP = 0.01;
 
-  // --- フレーム（長方形の枠） ---
-  const frameParts = [
-    // 長辺（左右）
-    [0.03, 0.04, BED_L, -BED_W / 2, BED_H, 0],
-    [0.03, 0.04, BED_L, BED_W / 2, BED_H, 0],
-    // 短辺（前後）
-    [BED_W, 0.04, 0.03, 0, BED_H, BED_L / 2],
-    [BED_W, 0.04, 0.03, 0, BED_H, -BED_L / 2 + BACK_L],
-  ];
-  frameParts.forEach(([w, h, d, x, y, z]) => {
-    const geo = new THREE.BoxGeometry(w, h, d);
-    const mesh = new THREE.Mesh(geo, frameMat);
-    mesh.position.set(x, y, z);
-    lounger.add(mesh);
-  });
-
-  // --- 座面のスラット（横板、寝る部分） ---
-  const slatCount = 12;
-  const slatArea = BED_L - BACK_L - 0.05;
-  const slatSpacing = slatArea / slatCount;
+  // --- 座面（横板5枚） ---
+  const slatCount = 5;
+  const slatW = (SEAT_W - SLAT_GAP * (slatCount - 1)) / slatCount;
   for (let i = 0; i < slatCount; i++) {
-    const geo = new THREE.BoxGeometry(BED_W - 0.06, SLAT_T, 0.04);
-    const slat = new THREE.Mesh(geo, frameMat);
-    slat.position.set(0, BED_H + SLAT_T / 2, -BED_L / 2 + BACK_L + 0.05 + i * slatSpacing);
-    lounger.add(slat);
+    const geo = new THREE.BoxGeometry(slatW, SLAT_T, SEAT_D);
+    const slat = new THREE.Mesh(geo, woodMat);
+    const xOff = -SEAT_W / 2 + slatW / 2 + i * (slatW + SLAT_GAP);
+    slat.position.set(xOff, SEAT_H, 0);
+    slat.rotation.x = -0.08; // 微傾斜
+    chair.add(slat);
   }
 
-  // --- 背もたれフレーム（左右のサイドレール + 上端バー） ---
-  const backTopY = BED_H + Math.sin(BACK_ANGLE) * BACK_L;
-  const backTopZ = -BED_L / 2;
-  const backBottomZ = -BED_L / 2 + BACK_L;
-  const sideLen = BACK_L / Math.cos(BACK_ANGLE);
-
-  [-1, 1].forEach((side) => {
-    const sideGeo = new THREE.BoxGeometry(0.03, 0.04, sideLen);
-    const sideRail = new THREE.Mesh(sideGeo, frameMat);
-    sideRail.position.set(
-      side * BED_W / 2,
-      BED_H + Math.sin(BACK_ANGLE) * BACK_L / 2,
-      -BED_L / 2 + BACK_L / 2
-    );
-    sideRail.rotation.x = -BACK_ANGLE;
-    lounger.add(sideRail);
-  });
-
-  // 上端バー
-  const topBarGeo = new THREE.BoxGeometry(BED_W, 0.04, 0.03);
-  const topBar = new THREE.Mesh(topBarGeo, frameMat);
-  topBar.position.set(0, backTopY, backTopZ);
-  topBar.rotation.x = -BACK_ANGLE;
-  lounger.add(topBar);
-
-  // --- 背もたれスラット ---
+  // --- 背もたれ（扇状に5枚） ---
   const backSlats = 5;
+  const backSlatW = (SEAT_W * 0.9 - SLAT_GAP * (backSlats - 1)) / backSlats;
   for (let i = 0; i < backSlats; i++) {
-    const t = (i + 0.5) / backSlats;
-    const geo = new THREE.BoxGeometry(BED_W - 0.06, SLAT_T, 0.04);
-    const slat = new THREE.Mesh(geo, frameMat);
-    slat.position.set(
-      0,
-      BED_H + Math.sin(BACK_ANGLE) * BACK_L * (1 - t),
-      -BED_L / 2 + BACK_L * t
-    );
-    slat.rotation.x = -BACK_ANGLE;
-    lounger.add(slat);
+    const h = BACK_H + (i === 2 ? 0.06 : i === 1 || i === 3 ? 0.03 : 0); // 中央が高い
+    const geo = new THREE.BoxGeometry(backSlatW, h, SLAT_T);
+    const slat = new THREE.Mesh(geo, woodMat);
+    const xOff = -SEAT_W * 0.45 + backSlatW / 2 + i * (backSlatW + SLAT_GAP);
+    slat.position.set(xOff, SEAT_H + h / 2 * Math.cos(-BACK_ANGLE), -SEAT_D / 2 + h / 2 * Math.sin(-BACK_ANGLE));
+    slat.rotation.x = BACK_ANGLE;
+    chair.add(slat);
   }
 
-  // --- 脚（4本） ---
-  const legH = BED_H;
-  const legGeo = new THREE.BoxGeometry(0.03, legH, 0.03);
-  [
-    [-BED_W / 2 + 0.03, legH / 2, -BED_L / 2 + 0.05],
-    [BED_W / 2 - 0.03, legH / 2, -BED_L / 2 + 0.05],
-    [-BED_W / 2 + 0.03, legH / 2, BED_L / 2 - 0.05],
-    [BED_W / 2 - 0.03, legH / 2, BED_L / 2 - 0.05],
-  ].forEach(([x, y, z]) => {
-    const leg = new THREE.Mesh(legGeo, frameMat);
-    leg.position.set(x, y, z);
-    lounger.add(leg);
+  // --- アームレスト（左右の幅広板） ---
+  const armGeo = new THREE.BoxGeometry(0.1, SLAT_T, SEAT_D + 0.15);
+  [-1, 1].forEach((side) => {
+    const arm = new THREE.Mesh(armGeo, woodMat);
+    arm.position.set(side * (SEAT_W / 2 + 0.04), SEAT_H + 0.12, 0.05);
+    chair.add(arm);
   });
 
-  return lounger;
+  // --- 前脚（2本） ---
+  const frontLegGeo = new THREE.BoxGeometry(0.04, SEAT_H + 0.12, 0.04);
+  [-1, 1].forEach((side) => {
+    const leg = new THREE.Mesh(frontLegGeo, woodMat);
+    leg.position.set(side * (SEAT_W / 2 + 0.04), (SEAT_H + 0.12) / 2, SEAT_D / 2);
+    chair.add(leg);
+  });
+
+  // --- 後脚（2本、斜め） ---
+  const backLegGeo = new THREE.BoxGeometry(0.04, SEAT_H + 0.05, 0.04);
+  [-1, 1].forEach((side) => {
+    const leg = new THREE.Mesh(backLegGeo, woodMat);
+    leg.position.set(side * (SEAT_W / 2 + 0.04), (SEAT_H + 0.05) / 2, -SEAT_D / 2 + 0.05);
+    leg.rotation.x = BACK_ANGLE * 0.3;
+    chair.add(leg);
+  });
+
+  return chair;
 }

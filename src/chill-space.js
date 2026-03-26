@@ -453,26 +453,39 @@ function _buildColdBath(group) {
     group.add(_streamMesh);
   }
 
-  // --- 桶（プラスチック製、白） ---
+  // --- 桶（プラスチック製、白、洗面器型） ---
   const bucketGroup = new THREE.Group();
   const plasticMat = new THREE.MeshStandardMaterial({
     color: 0xf0f0f0,
     roughness: 0.4,
     metalness: 0.05,
+    side: THREE.DoubleSide,
   });
 
-  // 桶本体
-  const bucketGeo = new THREE.CylinderGeometry(0.11, 0.09, 0.13, 16);
-  const bucket = new THREE.Mesh(bucketGeo, plasticMat);
-  bucket.position.y = 0.065;
-  bucketGroup.add(bucket);
+  // LatheGeometry で洗面器の断面を回転
+  // 断面: 底面中心→底面外縁→側面（外側、テーパー）→縁上面→縁内側→側面（内側）→底面内側
+  const R_BOTTOM_OUT = 0.09;
+  const R_TOP_OUT = 0.12;
+  const R_TOP_IN = 0.105;
+  const R_BOTTOM_IN = 0.075;
+  const H = 0.13;
+  const RIM_H = 0.015;
+  const WALL_THICK = 0.012;
 
-  // 縁（少し広がったリム）
-  const rimGeo = new THREE.TorusGeometry(0.115, 0.012, 8, 16);
-  const rim = new THREE.Mesh(rimGeo, plasticMat);
-  rim.position.y = 0.13;
-  rim.rotation.x = Math.PI / 2;
-  bucketGroup.add(rim);
+  const points = [
+    new THREE.Vector2(0, 0),                        // 底面中心
+    new THREE.Vector2(R_BOTTOM_OUT, 0),              // 底面外縁
+    new THREE.Vector2(R_TOP_OUT, H - RIM_H),         // 側面外側上端
+    new THREE.Vector2(R_TOP_OUT + 0.005, H),          // 縁の外側上角
+    new THREE.Vector2(R_TOP_IN, H),                   // 縁の内側上角
+    new THREE.Vector2(R_TOP_IN, H - RIM_H),           // 縁の内側下角
+    new THREE.Vector2(R_BOTTOM_IN, WALL_THICK),       // 側面内側下端
+    new THREE.Vector2(0, WALL_THICK),                 // 底面内側中心
+  ];
+
+  const bucketGeo = new THREE.LatheGeometry(points, 24);
+  const bucket = new THREE.Mesh(bucketGeo, plasticMat);
+  bucketGroup.add(bucket);
 
   bucketGroup.position.set(BX - 0.8, BH, BZ + BD / 2 + T + 0.05);
   group.add(bucketGroup);

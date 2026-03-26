@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 // チルスペースはサウナ室(x:-2〜+2)の左側に配置
 const SPACE_WIDTH = 6;
@@ -29,7 +31,7 @@ export function buildChillSpace(scene) {
   _buildFloor(group);
   _buildWalls(group);
   _buildColdBath(group);
-  _buildAdirondackChairs(group);
+  _buildChairs(group);
 
   // --- ライティング（朝焼けの雰囲気、PointLight で距離制限） ---
   // 空からの朝焼け光（オレンジ〜ピンク）
@@ -492,21 +494,39 @@ function _buildColdBath(group) {
 }
 
 /**
- * アディロンダックチェア（白）
- * 幅広アームレスト、扇状の背もたれが特徴
+ * ガーデンチェア（GLBモデル読み込み）
  */
-function _buildAdirondackChairs(group) {
+function _buildChairs(group) {
   const positions = [
     { x: ORIGIN_X - 1.2, z: 0.8, rot: 0.4 },
     { x: ORIGIN_X - 0.0, z: 1.4, rot: 0.05 },
     { x: ORIGIN_X + 1.2, z: 1.0, rot: -0.3 },
   ];
 
-  positions.forEach(({ x, z, rot }) => {
-    const chair = _createAdirondackChair();
-    chair.position.set(x, 0, z);
-    chair.rotation.y = rot;
-    group.add(chair);
+  const dracoLoader = new DRACOLoader();
+  dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+
+  const loader = new GLTFLoader();
+  loader.setDRACOLoader(dracoLoader);
+
+  loader.load('/models/chair.glb', (gltf) => {
+    const source = gltf.scene;
+
+    // モデルは既にZ-up→Y-up回転を内包しているので追加回転不要
+    const box = new THREE.Box3().setFromObject(source);
+    const size = box.getSize(new THREE.Vector3());
+    const scale = 0.7 / size.y; // 高さ(Y軸)を約0.7mに
+
+    positions.forEach(({ x, z, rot }, i) => {
+      const clone = i === 0 ? source : source.clone();
+      clone.scale.setScalar(scale);
+
+      // 底面を床に合わせる
+      const scaledBox = new THREE.Box3().setFromObject(clone);
+      clone.position.set(x, -scaledBox.min.y, z);
+      clone.rotation.y = rot;
+      group.add(clone);
+    });
   });
 }
 
@@ -591,72 +611,3 @@ export function updateChillSpace(time) {
   }
 }
 
-function _createAdirondackChair() {
-  const chair = new THREE.Group();
-
-  const woodMat = new THREE.MeshStandardMaterial({
-    color: 0xf0ede8,
-    roughness: 0.75,
-    metalness: 0.0,
-  });
-
-  const SEAT_W = 0.55;
-  const SEAT_D = 0.5;
-  const SEAT_H = 0.32;
-  const BACK_H = 0.55;
-  const BACK_ANGLE = -0.35; // 傾斜
-  const SLAT_T = 0.02; // 板の厚さ
-  const SLAT_GAP = 0.01;
-
-  // --- 座面（横板5枚） ---
-  const slatCount = 5;
-  const slatW = (SEAT_W - SLAT_GAP * (slatCount - 1)) / slatCount;
-  for (let i = 0; i < slatCount; i++) {
-    const geo = new THREE.BoxGeometry(slatW, SLAT_T, SEAT_D);
-    const slat = new THREE.Mesh(geo, woodMat);
-    const xOff = -SEAT_W / 2 + slatW / 2 + i * (slatW + SLAT_GAP);
-    slat.position.set(xOff, SEAT_H, 0);
-    slat.rotation.x = -0.08; // 微傾斜
-    chair.add(slat);
-  }
-
-  // --- 背もたれ（扇状に5枚） ---
-  const backSlats = 5;
-  const backSlatW = (SEAT_W * 0.9 - SLAT_GAP * (backSlats - 1)) / backSlats;
-  for (let i = 0; i < backSlats; i++) {
-    const h = BACK_H + (i === 2 ? 0.06 : i === 1 || i === 3 ? 0.03 : 0); // 中央が高い
-    const geo = new THREE.BoxGeometry(backSlatW, h, SLAT_T);
-    const slat = new THREE.Mesh(geo, woodMat);
-    const xOff = -SEAT_W * 0.45 + backSlatW / 2 + i * (backSlatW + SLAT_GAP);
-    slat.position.set(xOff, SEAT_H + h / 2 * Math.cos(-BACK_ANGLE), -SEAT_D / 2 + h / 2 * Math.sin(-BACK_ANGLE));
-    slat.rotation.x = BACK_ANGLE;
-    chair.add(slat);
-  }
-
-  // --- アームレスト（左右の幅広板） ---
-  const armGeo = new THREE.BoxGeometry(0.1, SLAT_T, SEAT_D + 0.15);
-  [-1, 1].forEach((side) => {
-    const arm = new THREE.Mesh(armGeo, woodMat);
-    arm.position.set(side * (SEAT_W / 2 + 0.04), SEAT_H + 0.12, 0.05);
-    chair.add(arm);
-  });
-
-  // --- 前脚（2本） ---
-  const frontLegGeo = new THREE.BoxGeometry(0.04, SEAT_H + 0.12, 0.04);
-  [-1, 1].forEach((side) => {
-    const leg = new THREE.Mesh(frontLegGeo, woodMat);
-    leg.position.set(side * (SEAT_W / 2 + 0.04), (SEAT_H + 0.12) / 2, SEAT_D / 2);
-    chair.add(leg);
-  });
-
-  // --- 後脚（2本、斜め） ---
-  const backLegGeo = new THREE.BoxGeometry(0.04, SEAT_H + 0.05, 0.04);
-  [-1, 1].forEach((side) => {
-    const leg = new THREE.Mesh(backLegGeo, woodMat);
-    leg.position.set(side * (SEAT_W / 2 + 0.04), (SEAT_H + 0.05) / 2, -SEAT_D / 2 + 0.05);
-    leg.rotation.x = BACK_ANGLE * 0.3;
-    chair.add(leg);
-  });
-
-  return chair;
-}

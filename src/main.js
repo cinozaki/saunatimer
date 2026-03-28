@@ -27,6 +27,11 @@ const camera = new THREE.PerspectiveCamera(
   100
 );
 
+// デバッグ用: Playwright スクリーンショットスクリプトからカメラを操作可能にする
+if (typeof window !== 'undefined') {
+  window.__THREE__ = { _camera: camera, _scene: scene };
+}
+
 // --- サウナ室 ---
 buildSaunaRoom(scene);
 buildFurniture(scene);

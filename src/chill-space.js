@@ -246,6 +246,60 @@ function _buildColdBath(group) {
     group.add(mesh);
   });
 
+  // オーバーフロー排水格子（手前・左・右の3辺、縁の外側）
+  {
+    const grateW = 0.18;  // 格子の幅
+    const grateH = 0.005; // 格子の厚み
+    const grateY = 0.015; // 床面すれすれ
+    const grateMat = new THREE.MeshStandardMaterial({
+      color: 0x555555,
+      roughness: 0.6,
+      metalness: 0.4,
+    });
+    const slotMat = new THREE.MeshStandardMaterial({
+      color: 0x222222,
+      roughness: 0.9,
+      metalness: 0.1,
+    });
+
+    // 格子を構成（長手方向=ローカルX軸、rotYで向きを変える）
+    const buildGrate = (length, posX, posZ, rotY) => {
+      const grateGroup = new THREE.Group();
+
+      // 溝（暗い凹み）
+      const slotGeo = new THREE.BoxGeometry(length, 0.03, grateW + 0.02);
+      const slot = new THREE.Mesh(slotGeo, slotMat);
+      slot.position.y = 0.005;
+      grateGroup.add(slot);
+
+      // 格子バー（浴槽の辺に平行 = 長手方向に走る）
+      const barCount = Math.floor(grateW / 0.015);
+      const barGeo = new THREE.BoxGeometry(length, grateH, 0.005);
+      for (let i = 0; i < barCount; i++) {
+        const bar = new THREE.Mesh(barGeo, grateMat);
+        const z = -grateW / 2 + 0.005 + i * (grateW / barCount);
+        bar.position.set(0, 0.02, z);
+        grateGroup.add(bar);
+      }
+
+      grateGroup.position.set(posX, grateY, posZ);
+      grateGroup.rotation.y = rotY;
+      group.add(grateGroup);
+    };
+
+    // 手前（水風呂の手前縁の外側）
+    const frontZ = BZ + BD / 2 + T + grateW / 2 + 0.02;
+    buildGrate(BW + T * 2 + grateW * 2, BX, frontZ, 0);
+
+    // 左側
+    const leftX = BX - BW / 2 - T - grateW / 2 - 0.02;
+    buildGrate(BD + T * 2, leftX, BZ, Math.PI / 2);
+
+    // 右側
+    const rightX = BX + BW / 2 + T + grateW / 2 + 0.02;
+    buildGrate(BD + T * 2, rightX, BZ, Math.PI / 2);
+  }
+
   // 底
   const bottomGeo = new THREE.PlaneGeometry(BW, BD);
   const bottomMat = new THREE.MeshStandardMaterial({
@@ -491,6 +545,170 @@ function _buildColdBath(group) {
 
   bucketGroup.position.set(BX - 0.8, BH, BZ + BD / 2 + T + 0.05);
   group.add(bucketGroup);
+
+  // --- 立ちシャワー（水風呂の左側、奥壁寄り） ---
+  const showerX = BX - BW / 2 - 0.5;
+  const showerZ = -SPACE_DEPTH / 2 + 0.25; // 奥壁寄り
+
+  const chromeMat = new THREE.MeshStandardMaterial({
+    color: 0xcccccc,
+    roughness: 0.15,
+    metalness: 0.95,
+  });
+  const darkMat = new THREE.MeshStandardMaterial({
+    color: 0x333333,
+    roughness: 0.4,
+    metalness: 0.8,
+  });
+
+  // 支柱（床から天井付近まで）
+  const poleH = 2.2;
+  const poleGeo = new THREE.CylinderGeometry(0.02, 0.02, poleH, 8);
+  const pole = new THREE.Mesh(poleGeo, chromeMat);
+  pole.position.set(showerX, poleH / 2, showerZ);
+  group.add(pole);
+
+  // 壁取付プレート（奥壁に固定）
+  const showerMountGeo = new THREE.BoxGeometry(0.12, 0.08, 0.02);
+  const showerMount = new THREE.Mesh(showerMountGeo, chromeMat);
+  showerMount.position.set(showerX, 1.2, -SPACE_DEPTH / 2 + 0.01);
+  group.add(showerMount);
+
+  // 壁から支柱への接続アーム
+  const armGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.15, 8);
+  const armMount = new THREE.Mesh(armGeo, chromeMat);
+  armMount.rotation.x = Math.PI / 2;
+  armMount.position.set(showerX, 1.2, -SPACE_DEPTH / 2 + 0.08);
+  group.add(armMount);
+
+  // シャワーヘッド部（上部、レインシャワー型）
+  // ヘッド取付アーム（支柱上端から手前に伸びる）
+  const headArmGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.25, 8);
+  const headArm = new THREE.Mesh(headArmGeo, chromeMat);
+  headArm.rotation.x = Math.PI / 2;
+  headArm.position.set(showerX, poleH - 0.05, showerZ + 0.12);
+  group.add(headArm);
+
+  // レインシャワーヘッド（薄い円盤）
+  const headGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.015, 16);
+  const head = new THREE.Mesh(headGeo, darkMat);
+  head.position.set(showerX, poleH - 0.07, showerZ + 0.25);
+  group.add(head);
+
+  // ヘッド底面（穴あきプレート風）
+  const headFaceGeo = new THREE.CircleGeometry(0.095, 16);
+  const headFaceMat = new THREE.MeshStandardMaterial({
+    color: 0x444444,
+    roughness: 0.5,
+    metalness: 0.7,
+    side: THREE.DoubleSide,
+  });
+  const headFace = new THREE.Mesh(headFaceGeo, headFaceMat);
+  headFace.rotation.x = Math.PI / 2;
+  headFace.position.set(showerX, poleH - 0.08, showerZ + 0.25);
+  group.add(headFace);
+
+  // 混合水栓（支柱中程）
+  const valveY = 1.1;
+  // 水栓本体
+  const valveGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.06, 8);
+  const valve = new THREE.Mesh(valveGeo, chromeMat);
+  valve.rotation.z = Math.PI / 2;
+  valve.position.set(showerX, valveY, showerZ);
+  group.add(valve);
+
+  // ハンドル（左右）
+  const handleGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.04, 8);
+  [-0.05, 0.05].forEach((dz) => {
+    const handle = new THREE.Mesh(handleGeo, chromeMat);
+    handle.position.set(showerX, valveY, showerZ + dz);
+    group.add(handle);
+    // ハンドルトップ
+    const topGeo = new THREE.SphereGeometry(0.02, 8, 6);
+    const top = new THREE.Mesh(topGeo, chromeMat);
+    top.position.set(showerX, valveY + 0.02, showerZ + dz);
+    group.add(top);
+  });
+
+  // --- ハンドシャワー（壁ホルダー + U字ホース + ノズル） ---
+  const wallZ = -SPACE_DEPTH / 2 + 0.02; // 奥壁面
+  const holderY = 1.3;
+
+  // ホルダー（壁に取付、ノズルを引っ掛けるフック型）
+  const holderPlateGeo = new THREE.BoxGeometry(0.06, 0.08, 0.02);
+  const holderPlate = new THREE.Mesh(holderPlateGeo, chromeMat);
+  holderPlate.position.set(showerX, holderY, wallZ + 0.01);
+  group.add(holderPlate);
+
+  // フック部分（U字型、ノズルを掛ける）
+  const hookCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(showerX, holderY + 0.03, wallZ + 0.02),
+    new THREE.Vector3(showerX, holderY + 0.03, wallZ + 0.06),
+    new THREE.Vector3(showerX, holderY - 0.01, wallZ + 0.07),
+    new THREE.Vector3(showerX, holderY - 0.03, wallZ + 0.05),
+  ]);
+  const hookGeo = new THREE.TubeGeometry(hookCurve, 8, 0.006, 6, false);
+  const hook = new THREE.Mesh(hookGeo, chromeMat);
+  group.add(hook);
+
+  // ノズル（ホルダーに掛かった状態、下向き）
+  const nozzleX = showerX;
+  const nozzleY = holderY - 0.02;
+  const nozzleZ = wallZ + 0.06;
+
+  // グリップ
+  const nozzleGripGeo = new THREE.CylinderGeometry(0.018, 0.014, 0.12, 8);
+  const nozzleGrip = new THREE.Mesh(nozzleGripGeo, darkMat);
+  nozzleGrip.position.set(nozzleX, nozzleY - 0.06, nozzleZ);
+  group.add(nozzleGrip);
+
+  // ノズルヘッド（散水部）
+  const nozzleHeadGeo = new THREE.CylinderGeometry(0.028, 0.018, 0.035, 8);
+  const nozzleHead = new THREE.Mesh(nozzleHeadGeo, chromeMat);
+  nozzleHead.position.set(nozzleX, nozzleY - 0.14, nozzleZ);
+  group.add(nozzleHead);
+
+  // ホース（水栓下→U字に垂れ下がる→ノズルへ上がる）
+  const hoseBottomY = 0.3; // U字の最下点
+  const hoseCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(showerX, valveY - 0.04, showerZ + 0.02),    // 水栓下部
+    new THREE.Vector3(showerX, valveY - 0.15, showerZ + 0.08),    // 下降
+    new THREE.Vector3(showerX + 0.03, hoseBottomY + 0.1, showerZ + 0.10), // 垂れ
+    new THREE.Vector3(showerX, hoseBottomY, showerZ + 0.06),      // U字底
+    new THREE.Vector3(showerX - 0.03, hoseBottomY + 0.1, wallZ + 0.10),   // 上昇
+    new THREE.Vector3(showerX, nozzleY - 0.12, nozzleZ),          // ノズルグリップ下端
+  ]);
+  const hoseGeo = new THREE.TubeGeometry(hoseCurve, 24, 0.009, 6, false);
+  const hoseMat = new THREE.MeshStandardMaterial({
+    color: 0x999999,
+    roughness: 0.25,
+    metalness: 0.7,
+  });
+  const hose = new THREE.Mesh(hoseGeo, hoseMat);
+  group.add(hose);
+  group.add(nozzleHead);
+
+  // 排水口（床面、シャワー下）
+  const drainGeo = new THREE.CircleGeometry(0.12, 16);
+  const drainMat = new THREE.MeshStandardMaterial({
+    color: 0x444444,
+    roughness: 0.8,
+    metalness: 0.3,
+    side: THREE.DoubleSide,
+  });
+  const drain = new THREE.Mesh(drainGeo, drainMat);
+  drain.rotation.x = -Math.PI / 2;
+  drain.position.set(showerX, 0.015, showerZ + 0.15);
+  group.add(drain);
+
+  // シャワーエリアの照明（上部 + 中程）
+  const showerLightTop = new THREE.PointLight(0xeeddcc, 1.0, 3);
+  showerLightTop.position.set(showerX, 2.5, showerZ + 0.2);
+  group.add(showerLightTop);
+
+  const showerLightMid = new THREE.PointLight(0xeeddcc, 0.6, 2);
+  showerLightMid.position.set(showerX + 0.15, 1.0, showerZ + 0.3);
+  group.add(showerLightMid);
 }
 
 /**
